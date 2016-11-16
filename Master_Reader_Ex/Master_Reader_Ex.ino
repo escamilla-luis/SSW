@@ -11,20 +11,26 @@
 
 #include <Wire.h>
 
+char incoming_data;
+
 void setup() 
 {
   Wire.begin();         // join i2c bus (address optional for master)
+  Serial.begin(9600);   // start serial for output
 }
-
-byte x = 0;
 
 void loop() 
 {
-  Wire.beginTransmission(8); // transmit to device #8
-  Wire.write("x is ");       // sends five bytes
-  Wire.write(x);             // sends on byte
-  Wire.endTransmission();    // stop transmitting
+  Wire.requestFrom(8,32);
 
-  x++;
+  while (Wire.available())    // slave may send less than requested
+  {
+    int dist = Wire.read();
+    Serial.print(dist);
+    
+    incoming_data = Wire.read();
+    Serial.println(incoming_data);
+  }
   delay(500);
 }
+
