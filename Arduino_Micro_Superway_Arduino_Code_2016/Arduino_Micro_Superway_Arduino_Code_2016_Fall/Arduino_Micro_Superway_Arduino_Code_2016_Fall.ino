@@ -122,26 +122,60 @@ void status_LED(int status)
 {
   if (status == 0)
   {
-    analogWrite(RED, 255);  
+    analogWrite(RED, 255);
+    analogWrite(GREEN, 0);
+    analogWrite(BLUE, 0);  
   }
-  else if (status == 1)
+  else
   {
+    analogWrite(RED, 0);
     analogWrite(GREEN, 255);
+    analogWrite(BLUE, 0); 
   }
-  else if (status == 2)
+  if (status == 1)
+  {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 255);
+    analogWrite(BLUE, 0); 
+  }
+  else
+  {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 255);
+    analogWrite(BLUE, 0); 
+  }
+  if (status == 2)
   {
     for (int i=0 ; i <= 255; i++)
     {
       analogWrite(RED, 255);
+      analogWrite(GREEN, 0);
+      analogWrite(BLUE, 0);
       delay(500);
 
       analogWrite(RED, 0);
+      analogWrite(GREEN, 0);
+      analogWrite(BLUE, 0);
       delay(500);
     }
   }
-  else if (status == 3)
+  else
   {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 255);
+    analogWrite(BLUE, 0); 
+  }
+  if (status == 3)
+  {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 0); 
     analogWrite(BLUE, 255);
+  }
+  else
+  {
+    analogWrite(RED, 0);
+    analogWrite(GREEN, 255);
+    analogWrite(BLUE, 0); 
   }
 }
 
