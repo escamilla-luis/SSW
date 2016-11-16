@@ -1,10 +1,9 @@
+int greenPin = 3;              // pin 4, CC LED
+int bluePin = 5;               // pin 3, CC LED
+int redPin = 6;                // pin 1, CC LED
+
 void setup()
 {
-
-int redPin = 3;                 // pin 1, CC LED
-int greenPin = 6;               // pin 3, CC LED
-int bluePin = 9;                // pin 4, CC LED
-
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT); 
@@ -15,6 +14,7 @@ void loop()
 {
 
 status_LED(3);
+
 
 }
 
