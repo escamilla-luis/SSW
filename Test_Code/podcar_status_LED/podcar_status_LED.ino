@@ -1,9 +1,9 @@
 void setup()
 {
 
-int redPin = 3;
-int greenPin = 6;
-int bluePin = 9;
+int redPin = 3;                 // pin 1, CC LED
+int greenPin = 6;               // pin 3, CC LED
+int bluePin = 9;                // pin 4, CC LED
 
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
@@ -13,18 +13,6 @@ int bluePin = 9;
 
 void loop()
 {
-//
-//analogWrite(3, 255);  //turn red on
-//delay(1000);
-//analogWrite(3, 0);
-//
-//analogWrite(6, 125);  //turn green on
-//delay(1000);
-//analogWrite(6, 0);
-//
-//analogWrite(9, 125);  //turn blue on
-//delay(1000);
-//analogWrite(9, 0);
 
 status_LED(3);
 
@@ -32,28 +20,31 @@ status_LED(3);
 
 void status_LED(int status)
 {
-  if (status == 0)
+  if (status == 0)                  // 0 status is for stopped (red solid)
   {
-    analogWrite(3, 255);
+    analogWrite(redPin, 255);
   }
 
-  if (status == 1)
+  if (status == 1)                  // 1 status is for healthy (green solid)
   {
-    analogWrite(6, 255);
+    analogWrite(greenPin, 255);
   }
 
-  if (status == 2)
+  if (status == 2)                  // 2 status is for error (red flashing)
   {
     for (int i=0; i <= 255; i++)
     {
-      analogWrite(3, 255);
+      analogWrite(redPin, 255);
       delay(500);
-      analogWrite(3, 0);
+      analogWrite(redPin, 0);
       delay(500);
     }
   }
 
-  if (status == 3)
+  if (status == 3)                  // 3 status is for checkpoint reached (blue solid)
+  {
+    analogWrite(bluePin, 255);
+  }
 
 
 }
