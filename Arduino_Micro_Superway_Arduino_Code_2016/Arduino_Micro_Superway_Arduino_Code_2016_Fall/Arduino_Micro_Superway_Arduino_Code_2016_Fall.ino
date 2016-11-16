@@ -8,6 +8,7 @@
 #define BUTTON  2      // Kill Switch
 
 #define IS_PRESSED  LOW
+#define NOT_PRESSED HIGH
 #define OFF         LOW
 #define ON          HIGH
 
@@ -81,7 +82,13 @@ void loop()
   
   stop_counter++;
  }
- else if (digitalRead(BUTTON) == IS_PRESSED)
+ else
+ {
+  status_LED(1);
+
+  state = "Vehicle in motion";
+ }
+ if (digitalRead(BUTTON) == IS_PRESSED)
  {
   status_LED(2);
    
@@ -95,13 +102,7 @@ void loop()
   status_LED(1);
 
   state = "Vehicle in motion";
-
-  Wire.onRequest(requestStatus);
-  delay(100);
-  
-  stop_counter = 0;
- }
-   
+ }  
  if (stop_counter == 10)
  {
   restar_counter = 0;
