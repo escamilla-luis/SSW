@@ -7,8 +7,6 @@
 #define BLUE    5      // status of podcar
 #define BUTTON  2      // Kill Switch
 
-#define IS_PRESSED  LOW
-#define NOT_PRESSED HIGH
 #define OFF         LOW
 #define ON          HIGH
 
@@ -17,13 +15,12 @@
 int maximumRange = 200;  // Maximum range needed
 int minimumRange = 0;    // Minimum range needed
 long duration;           // Duration used to calculate distance
-int stop_counter = 0;
-int restar_counter = 0;
 
 int distance;
 int LEDstate;
 int event[]= {distance, LEDstate}; // stores LED state from 0 to 3
 boolean hall_state;   // status update of hall effect sensor
+boolean switch_state = true;
 
 void setup() 
 {
@@ -47,6 +44,7 @@ void setup()
 
 void loop()
 {
+ int buttonState = digitalRead(BUTTON); 
  receiveHalldata();
 
 /* The following trigPin/echoPin cycle is used to determine the
@@ -80,8 +78,33 @@ void loop()
   analogWrite(RED, 255);
   analogWrite(GREEN, 0);
   analogWrite(BLUE, 0);
-
-  stop_counter++;
+ }
+ else if (buttonState < 1)
+ {
+  LEDstate =3;
+  event[2] = LEDstate; 
+  switch_state = !switch_state;
+  delay(250);
+  
+  do
+  {
+   Wire.beginTransmission(8);
+   Wire.write(event[1]);
+   Wire.write(event[2]);
+   Wire.endTransmission();
+   delay(50);
+   
+   analogWrite(RED, 255);
+   analogWrite(GREEN, 0);
+   analogWrite(BLUE, 0);
+   delay(250);
+  
+   analogWrite(RED, 0);
+   analogWrite(GREEN, 0);
+   analogWrite(BLUE, 0);
+   delay(250);  
+  }
+  while(switch_state == false);
  }
  else
  {
@@ -91,18 +114,7 @@ void loop()
   analogWrite(GREEN, 255);
   analogWrite(BLUE, 0);
  }
-//
- if (stop_counter == 10)
- {
-  restar_counter = 0;
-  
-  Serial.print("\t\t\t\t");
-  Serial.println();
-    
-  stop_counter = 0;
-  delay(1000);
- }
-  // expect numbers like 0,1,2,3 for LED status
+ // expect numbers like 0,1,2,3 for LED status
  // 0 = Green, 1 = Red, 2 = Blue, 3 = Blinking Red
  // This function call will also include distance
  //Delay 50ms before next reading.
