@@ -1,0 +1,49 @@
+int greenPin = 3;              // pin 4, CC LED
+int bluePin = 5;               // pin 3, CC LED
+int redPin = 6;                // pin 1, CC LED
+
+void setup()
+{
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT); 
+
+  
+  Serial.begin(9600); 
+  
+}
+
+void loop()
+{
+
+analogWrite(redPin, 255);
+
+getStateLED(0);
+
+}
+
+void getStateLED(int status)
+{  
+  int result;
+  
+  if (analogRead(6) == 255)                 // if red pin is on solid
+  {
+    result = 0;                             // 0 status is for stopped (red solid)
+    Serial.print('Status is 0');
+  }
+
+  if (analogRead(3) == 255)                 // if green pin is on solid
+  {
+    result = 1;                             // 1 status is for healthy (green solid)
+    Serial.print('Status is 1');
+  }
+
+  if (analogRead(5) == 255)                 // if blue pin is on solid 
+  {
+    result = 3;                             // 3 status is for checkpoint (blue solid) 
+    Serial.print('Status is 3');
+  }
+  return result;
+  
+}
+
