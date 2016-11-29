@@ -13,7 +13,7 @@ void setup()
 void loop()
 {
 
-setStateLED(2);     // this is used for testing purposes to set the LED
+setStateLED(0);     // this is used for testing purposes to set the LED
 
 }
 

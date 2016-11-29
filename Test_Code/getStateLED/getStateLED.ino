@@ -16,14 +16,22 @@ void setup()
 void loop()
 {
 
-  digitalWrite(6, LOW);
+  digitalWrite(3, HIGH);              //testing, sending a solid LED
+
+//  for (int i=0; i < 5; i++)         //testing, sending a blinking LED
+//    {
+//      digitalWrite(redPin, HIGH);
+//      delay(500);
+//      digitalWrite(redPin, LOW);
+//      delay(500);
+//    }   
 
   int value;
 
   value = getStateLED();
 
   Serial.println(value);
-  delay(500);
+  delay(500);                 //remove delay for faster data when flashing
 
 }
 
@@ -37,11 +45,6 @@ int getStateLED()
   if (digitalRead(3) == 1)                 // if green pin is on solid
   {
     return 1;                              // 1 status is for healthy (green solid)
-  }
-
-  if (digitalRead(3) == 0 && digitalRead(5) == 0 && digitalRead(6) == 0)                 // if red pin is flashing 
-  {
-    return 4;                              // 4 status is for LEDs off 
   }
 
   if (digitalRead(5) == 1)                 // if blue pin is on solid 

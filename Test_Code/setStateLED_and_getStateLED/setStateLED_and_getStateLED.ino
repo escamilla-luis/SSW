@@ -69,11 +69,6 @@ int getStateLED()
     return 1;                              // 1 status is for healthy (green solid)
   }
 
-  if (digitalRead(3) == 0 && digitalRead(5) == 0 && digitalRead(6) == 0)                 // if red pin is flashing 
-  {
-    return 4;                              // 4 status is for LEDs off 
-  }
-
   if (digitalRead(5) == 1)                 // if blue pin is on solid 
   {
     return 3;                              // 3 status is for checkpoint (blue solid) 
