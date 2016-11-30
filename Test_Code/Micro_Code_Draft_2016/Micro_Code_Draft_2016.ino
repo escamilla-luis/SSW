@@ -16,11 +16,16 @@ int maximumRange = 200;  // Maximum range needed
 int minimumRange = 0;    // Minimum range needed
 long duration;           // Duration used to calculate distance
 
+// Transmitting values to the Uno
 int distance;
 int LEDstate;
 int event[]= {distance, LEDstate}; // stores LED state from 0 to 3
-boolean hall_state;   // status update of hall effect sensor
+
+// Latching button using software
 boolean switch_state = true;
+
+// Receiving values from Uno
+int hall_state[2];   // status update of hall effect sensor
 
 void setup() 
 {
@@ -45,7 +50,10 @@ void setup()
 void loop()
 {
  int buttonState = digitalRead(BUTTON); 
- receiveHalldata();
+ delay(50);
+
+ Wire.onReceive(hall_effect_state);
+ delay(50);
 
 /* The following trigPin/echoPin cycle is used to determine the
  distance of the nearest object by bouncing soundwaves off of it. */ 
@@ -65,10 +73,10 @@ void loop()
 
  event[1]= distance;
  
- Serial.print(duration);
- Serial.print("\t\t\t");
- Serial.print(distance); 
- Serial.println();
+ //Serial.print(duration);
+ //Serial.print("\t\t\t");
+ //Serial.print(distance); 
+ //Serial.println();
   
  // changed distance from 30 cm to 15 cm due to pole obstacle
  if (distance <= 15) 
@@ -106,6 +114,14 @@ void loop()
   }
   while(switch_state == false);
  }
+ else if(hall_state[1] == 0) || hall_state[2] == 0)
+ {
+  LEDstate =2;
+  event[2] = LEDstate;
+  analogWrite(RED, 0);
+  analogWrite(GREEN, 0);
+  analogWrite(BLUE, 255);
+ }
  else
  {
   LEDstate =0;
@@ -117,24 +133,25 @@ void loop()
  // expect numbers like 0,1,2,3 for LED status
  // 0 = Green, 1 = Red, 2 = Blue, 3 = Blinking Red
  // This function call will also include distance
- //Delay 50ms before next reading.
+ // Delay 50ms before next reading.
  Wire.beginTransmission(8);
  Wire.write(event[1]);
  Wire.write(event[2]);
+ 
  Wire.endTransmission();
  // Serial.println(event[1]);
  // Serial.println(event[2]);
  delay(50);
 }
 
-void receiveHalldata()
+void hall_effect_state(int howMany)
 {
-  Wire.requestFrom(8, 1);  // request hall effect sensor state
-  
   while(Wire.available())
   {
-    hall_state = Wire.read();
-    Serial.println(hall_state);
+    for(int i=1; i<=2; i++)
+    {
+     hall_state[i] = Wire.read(); 
+    }
   }
 }
 
