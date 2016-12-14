@@ -1,460 +1,284 @@
-#include <TimerOne.h>
-#include <ServoTimer2.h>
+// Libraries that will control the servo, the RFID, and allow I2C communication
+#include <AddicoreRFID.h>
 #include <Wire.h>
+#include <Servo.h>
 
-int maximumRange = 200; // Maximum range needed
-int minimumRange = 0; // Minimum range needed
-long duration, distance; // Duration used to calculate distance
-
-/////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////
-
-// Define vehicle id number. You should input a different car number to handle it
-#define vehicle_number  1
 
 // Pin Definitions
-#define motor_enco_1a       A2  // Interrupt pin using custom interrupt setup
-#define motor_enco_1b       A3  // (Motor 2 encoder on pins A4, A5 - not used)
-#define motor1_dir          A0  //
-#define motor2_dir          A1  //
-#define motor1              9   // PWM pin
-#define motor2              10  // PWM pin
-#define servo_pin           11  // PWM Pin
-#define switch_sensor       13  // Switch servo motor using magnetic sensor
-
-//System Wide Global Variables
-int state = 0;  // 0 = Offline, 1 = Online/Idle, 2 = Online/Active
-unsigned int track_location = 0;
-unsigned int instruction[25][2];
-int instruction_step = 0;
-
-// Control System Variables
-int sense_rpm = 0, pwm_out = 0, rpm_err;
-int acc_err, enc_count, set_rpm;
-const float v_Kp = 0.01, v_Ki = 0.1;
-boolean STOP = true;
-
-boolean enc_prestate;
-boolean servo_switch;
-int switch_left, switch_right;
-
-int head_distance = 60;
-int last_hDistance;
-const int dist_limit = 3;
-const int dist_thresh = 16;
+                                // Pins A4 and A5 are used for I2C comm between Micro and Uno
+                                // Pins 0 and 1 are used for Xbee comms
+#define HALL_SENSOR1  2         // Switch servo motor using hall effect sensor mounted on left of podcar
+#define HALL_SENSOR2  4         // Switch servo motor using hall effect sensor mounted on right of podcar
+#define MOTOR1_DIR    A0        // Encoder mounted on motor 1
+#define MOTOR2_DIR    A1        // Encoder mounted on motor 2
+#define MOTOR1        5         // PWM pin to control speed of motor 1
+#define MOTOR2        6         // PWM pin to control speed of motor 2
+#define SERVO_PIN     3         // PWM pin to control the angle of the servo
+#define OBSTRUCTION   8         // Stops motors based on ultrasonic reading
+#define ERR_BUTTON    7         // Stops motors based on button reading
 
 
-// Speed Controller Variables
-unsigned long last_update, ping;
-long period = 1000 / 20;
-int control_rpm;
+// RFID data type definition
+#define uchar   unsigned char
+#define uint    unsigned int
+uchar fifobytes;
+uchar fifoValue;
 
 
-// Communication Variables
-String input_string = "";         // String to hold incoming data
-boolean string_complete = false;  // Flag for checking if string is complete
-boolean string_enable = false;    // Flag for stream in
+// Names the RFID reader
+AddicoreRFID myRFID;      // create AddicoreRFID object to control the RFID module
 
-byte *_track    = new byte[2];  // Temporary char arrays for
-byte *_distance = new byte[2];  // parsing chars into 16 bit
-byte *_speed    = new byte[2];  // data types
-byte *_m_count  = new byte[2];
+////////////////////////////////////////////////////////////////////////////////////
+// set the pins
+////////////////////////////////////////////////////////////////////////////////////
+
+// Pins that SDA (PIN 10) and RESET (PIN 9) are connected to on Uno
+const int chipSelectPin = 10;
+const int NRSTPD = 9;
 
 
+//Maximum length of the array
+#define MAX_LEN 16
 
-ServoTimer2 servo;
+
+// Variables that store the state of the button and ultrasonic to make
+// the podcar stop
+int button;
+int ultrasonic;
+
+
+// Values to store the readings from the hall effect sensors
+int hall_1_state;
+int hall_2_state;
+
+
+// For button state
+#define NOT_PRESSED          LOW
+#define IS_PRESSED           HIGH
+
+
+// For ultrasonic
+#define OFF                  LOW
+#define ON                   HIGH
+
+
+// Stores the station number
+int StationId;            
+
+
+// Declares and recognizes the servo
+Servo myservo;
+
+
 void setup() 
 {
-    Wire.begin();         // join the i2c bus (address not needed if master device)
-
-    // Disable interrupts
-    noInterrupts();
-
-
-   
-    // Set fast pwm pins
-    PCICR |= 0x01;  PCMSK1 |= 0x08;
-    
-    // Timer Counter Control Register for Timer0
-    //  Set clock mode for timer one
-    //TCCR0A = 0xa1;  TCCR0B = 0x01;
-    
-    // Set clock speed
-    //  - A: First timer limit
-    //  - B: PWM Duty cycle
-    //    Used for motor speed pwm control
-    //OCR0A = 0;      OCR0B = 0;      // overflow 1, 0% duty cycle
-    
-    
-    // Component Pinmodes
-
-    pinMode(servo_pin, OUTPUT);         // Servo control
-    pinMode(motor_enco_1a, INPUT);      // Encoder interrupt
-    pinMode(motor_enco_1b, INPUT);      // Encoder interrupt
-    pinMode(motor1, OUTPUT);            // motor 1 pwm
-    pinMode(motor2, OUTPUT);            // motor 2 pwm
-    pinMode(motor1_dir, OUTPUT);        // motor 1 direction
-    pinMode(motor2_dir, OUTPUT);        // motor 2 direction
-    pinMode(switch_sensor,INPUT);       // switching using magnetic sensor
+  // Inputs
+  pinMode(HALL_SENSOR1, INPUT);
+  pinMode(HALL_SENSOR2, INPUT);
+  pinMode(ERR_BUTTON, INPUT);
+  pinMode(OBSTRUCTION, INPUT);
 
 
-    digitalWrite(motor1_dir, HIGH);     // Set initial motor1 direction
-    digitalWrite(motor2_dir, LOW);      // Set initial motor2 diection
-    digitalWrite(motor_enco_1a, LOW);   // Set interrupt condition
-    digitalWrite(motor_enco_1b, LOW);   //   or disable pullup resistor
-    
-    servo.attach(servo_pin);
-
-    if(vehicle_number == 5){
-       switch_left = 800; switch_right = 2100;
-    } else {
-        
-      
-         switch_left = 2100; switch_right = 800;
-    }
-    
-    
-    // Set TimerOne to signal at 20Hz frequency (20 times/sec)
-    Timer1.initialize(1000000 / 1000);
-    
-    
-    // Hardware Interrupts
-    
-    // Set up External Interrupts on Analog pins
-    PCMSK1 |= 0b00111100;
-    PCICR  |= 0b00000010;
-
-   
- 
-    // Serial Communication
-    Serial.begin(57600);
-
-    
-    
-    // Set Initial Variables
-    state = 1;
-    enc_count = 0;
-    set_rpm = 0;
-    
-    // Start timer1 PWM for Motors
-    Timer1.pwm(motor1, 0);
-    Timer1.pwm(motor2, 0);
-
-    // Send online signal
-    byte checksum = 0x00;
-    
-    checksum = 0x00 + (byte)vehicle_number + 0x30 + (byte)state;
-    
-    Serial.print((char)0x81);             //Message Start
-    Serial.print((char)0x00);             //  0 Receiver
-    Serial.print((char)vehicle_number);   //  1 Sender
-    Serial.print((char)0x30);             //  2 Type
-    Serial.print((char)state);            //  3 Status
-    Serial.print((char)(0 - checksum));   //  4 Checksum
-    Serial.println((char)0x7E);           //Message End
-
-    
-
-    
-    // Reenable interrupts
-    interrupts();
+  // Outputs
+  pinMode(chipSelectPin, OUTPUT);     // Set digital pin 10 as OUTPUT to connect it to the RFID/ENABLE pin
+  pinMode(NRSTPD, OUTPUT);            // Set digital pin 10, Not Reset and Power-down
 
 
+  digitalWrite(NRSTPD, HIGH);
+  digitalWrite(chipSelectPin, LOW);   // Activate the RFID reader
 
+
+  // Begins communication between the RFID reader and the Uno
+  myRFID.AddicoreRFID_Init();
+
+
+  // Recognizes the servo
+  myservo.attach(SERVO_PIN);
+  
+
+  // Makes sure that at startup, the motors are off and the servo starts at 30 degrees
+  myservo.write(30);
+  analogWrite(MOTOR1, 0);
+  analogWrite(MOTOR2, 0);
+
+  
+  // Serial must be initialized for Xbee comm and Arduino comm
+  Wire.begin(8);        // join i2c bus (address optional for master)
+  Serial.begin(9600);  // start serial for output
 }
 
-
-void loop() {
-
-//switch inturrupt using magnetic sensor
-  
-  int switch_counter = digitalRead(switch_sensor);
-  if(switch_counter == HIGH)
-  {
-    instructionUpdate();
- 
-  }
-
-  delay(100);
-
-
- 
- //emergency stop using ultra sonic sensor
- 
-int emer = digitalRead(emergency_stop);
-if ( emer == HIGH)
+void loop()
 {
-  control_rpm = 0 ;
-                STOP = true;         
+  // Checks the state of the button continuously
+  button = digitalRead(ERR_BUTTON);
+
+
+  // Checks the distance from the ultrasonic sensor
+  ultrasonic = digitalRead(OBSTRUCTION);
+
+
+  // Checks if any magnet is read on the left of podcar
+  hall_1_state = digitalRead(HALL_SENSOR1);
+  delay(50);
+
+
+  // Checks if any magnet is read on the right of podcar
+  hall_2_state = digitalRead(HALL_SENSOR2);
+  delay(50);
+
+
+  // Retrieves the station that the podcar is at if a tag is read
+  getStationID();
+
+
+  // Checks to see if the button is pressed
+  if(button == IS_PRESSED && ultrasonic == OFF)
+  {
+    // Motors are off if button is pressed
+    analogWrite(MOTOR1, 0);
+    analogWrite(MOTOR2, 0);
   }
 
+  // Checks to see if there is any obstruction
+  if (button == NOT_PRESSED && ultrasonic == ON)
+  {
+    // Motors are off if distance is below or at 15 cm
+    analogWrite(MOTOR1, 0);
+    analogWrite(MOTOR2, 0);
+  }
+
+  // Checks to see if the hall effect sensor on the left of podcar read a magnet
+  if (hall_1_state == 0)
+  {
+    // Switches the lever arm so that left arm is up
+    myservo.write(30);
+    delay(250);
+  }
+
+  // Checks to see if the hall effect sensor on the right of podcar read a magnet
+  else if(hall_2_state == 0)
+  {
+    // Switches the lever arm so that right arm is up
+    myservo.write(150);
+    delay(250);
+  }
+}
+
+
+// Retrieves the Station ID
+void getStationID()
+{
+  // Variables used to retrieve the ID of a tag
+  uchar i, tmp, checksum1;
+  uchar status;
+  uchar str[MAX_LEN];
+  uchar RC_size;
+  uchar blockAddr;  //Selection operation block address 0 to 63
+  String mynum = "";
+
+  str[1] = 0x4400;
+
+        
+  //Find tags, return tag type
+  status = myRFID.AddicoreRFID_Request(PICC_REQIDL, str); 
   
-    // Run speed controller
-    if (millis() - last_update >= period)
-        controlsUpdate();
+  if (status == MI_OK)
+  {
+   uint tagType = str[0] << 8;
+   tagType = tagType + str[1];
+   switch (tagType) 
+   {
+    case 0x4400:
+    //Serial.println("Mifare UltraLight");
+    break;
+         
+    case 0x400:
+    //Serial.println("Mifare One (S50)");
+    break;
+         
+    case 0x200:
+    //Serial.println("Mifare One (S70)");
+    break;
+    
+    case 0x800:
+    //Serial.println("Mifare Pro (X)");
+    break;
+    
+    case 0x4403:
+    //Serial.println("Mifare DESFire");
+    break;
+    
+    default:
+    //Serial.println("Unknown");
+     break;
+   }
+  }
 
-    if (millis() - ping >= 2500){
-        heartbeat();
-    }
-}
 
-/* Request the reading from the slave device and update regularly. Set value equal to some variable and check for status */
+  //Anti-collision, return tag serial number 4 bytes
+  status = myRFID.AddicoreRFID_Anticoll(str);
 
-void controlsUpdate(){
-    // Collision Avoidance
-  // head_distance = ultrasonic(); //Update distance ahead of vehicle
-    
-    if (head_distance > dist_thresh)
-        control_rpm = set_rpm;
-    else if (head_distance <= dist_thresh && head_distance >= dist_limit)
-        control_rpm = set_rpm * (head_distance * head_distance) / (dist_thresh * dist_thresh);
-    else if (head_distance < dist_limit){
-        control_rpm = 0;
-        rpm_err = 0; acc_err = 0;
-    }
- 
-    
-    // PI Speed Controller
-    //count1 *= 5.27; //20(20hz) * 60(min) / 3(pole) / 75.81 ~94ticks/cycle or 1880/sec 4.133rev/s at wheels at max pwm
-    sense_rpm = (float)( enc_count / 6 ) * ( 1000.0 / (millis() - last_update));
-    
-    rpm_err = control_rpm - sense_rpm;
-    acc_err += rpm_err;
-    pwm_out = (v_Kp * rpm_err) + (v_Ki * acc_err);
-    
-    // PWM range limiter
-    if (pwm_out >= 255)     { pwm_out = 255;    }
-    else if (pwm_out <= 0)  { pwm_out = 0;      }
-    
-    // Update Motor power outputs
-    if (STOP) {
-        rpm_err = 0; acc_err = 0;
-        Timer1.setPwmDuty(motor1, 0);
-        Timer1.setPwmDuty(motor2, 0);
-    }
-    else if ( pwm_out > 4 && pwm_out <= 200) {
-        Timer1.setPwmDuty(motor1,  pwm_out    * 4);
-        Timer1.setPwmDuty(motor2, (pwm_out - 4) * 4);
-    }
-    else {
-        Timer1.setPwmDuty(motor1, pwm_out * 4);
-        Timer1.setPwmDuty(motor2, pwm_out * 4);
-    }
-    
-    // Servo control using clock signal
-    // Values = 800, 2100, program it so the second makes the left arm go up when it boots up
-    if (servo_switch)
-        servo.write(switch_right);
-    else
-        servo.write(switch_left);
+  if (status == MI_OK)
+  {
+   checksum1 = str[0] ^ str[1] ^ str[2] ^ str[3];
+   //Serial.print("The tag's number is:\t");
+   //Serial.print(str[0]);
+   //Serial.print(" , ");
+   //Serial.print(str[1]);
+   //Serial.print(" , ");
+   //Serial.print(str[2]);
+   //Serial.print(" , ");
+   //Serial.println(str[3]);
 
-    //Serial.println((String)"cRPM " + control_rpm + " sRPM " + sense_rpm + " PWM_out " + pwm_out + " eRPM " + rpm_err + " eAcc " + acc_err + " hDist " + head_distance);
-    
-    enc_count = 0;
-    last_update = millis();
-}
+   //Serial.print("Read Checksum:\t\t");
+   //Serial.println(str[4]);
+   //Serial.print("Calculated Checksum:\t");
+   //Serial.println(checksum1);
 
-void serialEvent() {
-    byte checksum = 0x00;
-    
-    while (Serial.available())
-    {
-        // Get new byte:
-        char char_in = (char)Serial.read();
-        
-        // End message
-        if (char_in == (char)0x7E && string_enable == true) {
-            string_complete = true;
-            string_enable = false;
-        
-            // Calculate checksum
-            if (checksum == 0)
-                processData();
-            else{
-                byte checksum = 0x00;
-                
-                checksum = 0x00 + (byte)vehicle_number + 0xF0 + (byte)state;
-                
-                Serial.print((char)0x81);             //Message Start
-                Serial.print((char)0x00);             //  0 Receiver
-                Serial.print((char)vehicle_number);   //  1 Sender
-                Serial.print((char)0x08);             //  2 Type
-                Serial.print((char)state);            //  3 Status
-                Serial.print((char)(0 - checksum));   //  8 Checksum
-                Serial.println((char)0x7E);           //Message End
-            }
-        }
-    
-        // Record incomming message
-        if (string_enable == true) {
-            input_string += char_in;
-            checksum += (byte)char_in;
-        }
-    
-        // Start Message
-        if (char_in == (char)0x81 && string_enable == false) {
-            string_enable = true;
-            input_string = "";
-        }
-    }
-}
+            
+   //Checks STATION ID based on RFID TAG ID
+   if (checksum1==50)
+   {
+    // If the tag that is read returns a checksum of 50, podcar is at Station 1
+    StationId=1;
+    Serial.print("StationId: \t\t");
+    Serial.print(StationId);
+    Serial.println();
 
-// Serial output function
-void sendMessage(String message) {
-    byte checksum = 0x00;
-    
-    // Write out message start character
-    Serial.print((char)0x81);
-    
-    // Write message
-    for (int ltr = 0; ltr < message.length(); ltr++) {
-        Serial.print(message.charAt(ltr));
-        checksum += (byte)message[ltr];
-    }
-    
-    // Write out checksum and message end character
-    Serial.print((char)0 - checksum);
-    Serial.println((char)0x7E);
-}
 
-void processData() {
-    char *temp = new char[2];
-    
-    if ((int)input_string[0] == vehicle_number || input_string[0] == 0xF0) {
-        if (input_string[2] == (char)0x1F) {      //Set all
-            temp[0] = input_string[4];
-            temp[1] = input_string[3];
-            memcpy(&track_location, temp, sizeof(int));
-            temp[0] = input_string[8];
-            temp[1] = input_string[7];
-            memcpy(&set_rpm, temp, sizeof(int));
+    // Podcar is in transit from Station 1 to Station 2
+    analogWrite(MOTOR1, 150);
+    analogWrite(MOTOR2, 150);
+   }
+
+   //Checks STATION ID based on RFID TAG ID         
+   if(checksum1==94)
+   {
+    // If the tag that is read returns a checksum of 94, podcar is at Station 2
+    StationId=2;
+    Serial.print("StationId: \t\t");
+    Serial.print(StationId);
+    Serial.println();
+
+
+    // Podcar has arrived at Station 2 and has stopped
+    analogWrite(MOTOR1, 0);
+    analogWrite(MOTOR2, 0);
+   }
             
             
-        } else if (input_string[2] == (char)0x05) { // Send Current State
-            sendState();
-        
-        } else if (input_string[2] == (char)0x01) { // Go
-            temp[0] = input_string[4];
-            temp[1] = input_string[5];
-            memcpy(&set_rpm, temp, sizeof(int));
-            STOP = false;
-        
-        } else if (input_string[2] == (char)0x02) { // Emergency Stop
-            set_rpm = 0;
-            STOP = true;
-        
-        } else if (input_string[2] == (char)0x07) { // Switch Servo
-            servo_switch = !servo_switch;
-        
-        } else if (input_string[2] == (char)0x10) { // Receive Instructions
-            int message_pos = 4;
-            int instruct_step = 0;
-            
-            while (message_pos < input_string.length()-1) {
-                instruction[instruct_step][0] = (input_string[message_pos] << 8) | (input_string[message_pos+1] & 0xFF);
-                instruction[instruct_step][1] = input_string[message_pos + 2];
-                
-                message_pos += 3;
-                instruct_step++;
-            }
-            instruction[instruct_step][0] = 0xFF;
-
-            // Signal message received
-            byte checksum = 0x00;
-            checksum = 0x00 + (byte)vehicle_number + 0x20 + (byte)state;
-            
-            Serial.print((char)0x81);             //Message Start
-            Serial.print((char)0x00);             //  0 Receiver
-            Serial.print((char)vehicle_number);   //  1 Sender
-            Serial.print((char)0x20);             //  2 Type
-            Serial.print((char)state);            //  3 Status
-            Serial.print((char)(0 - checksum));   //  8 Checksum
-            Serial.println((char)0x7E);           //Message End
-
-            //for(int i = 0; instruction[i][0] != 0xFF; i++)
-                //Serial.println((String)"Track: " + instruction[i][0] + " instruct: " + instruction[i][1]);
-
-            state = 2;
-              
-        }
-    }
-}
-
-void sendState() {
-    byte checksum = 0x00;
-    memcpy(_track, &track_location, sizeof(int));
-    memcpy(_speed, &sense_rpm, sizeof(int));
-
-    checksum = 0x00 + (byte)vehicle_number + 0x05 + (byte)state + (byte)_track[1] + (byte)_track[0] + (byte)_speed[1] + (byte)_speed[0];
-    
-    Serial.print((char)0x81);             //Message Start
-    Serial.print((char)0x00);             //  0 Receiver
-    Serial.print((char)vehicle_number);   //  1 Sender
-    Serial.print((char)0x05);             //  2 Type
-    Serial.print((char)state);            //  3 Status
-    Serial.print((char)_track[1]);        //  4 Track
-    Serial.print((char)_track[0]);        //  5
-    Serial.print((char)_speed[1]);        //  6 State
-    Serial.print((char)_speed[0]);        //  7
-    Serial.print((char)(0 - checksum));   //  8 Checksum
-    Serial.println((char)0x7E);           //Message End
-}
-
-void heartbeat() {
-    byte checksum = 0x00;
-    
-    checksum = 0x00 + (byte)vehicle_number + 0x08 + (byte)state;
-    
-    Serial.print((char)0x81);             //Message Start
-    Serial.print((char)0x00);             //  0 Receiver
-    Serial.print((char)vehicle_number);   //  1 Sender
-    Serial.print((char)0x08);             //  2 Type
-    Serial.print((char)state);            //  3 Status
-    Serial.print((char)(0 - checksum));   //  8 Checksum
-    Serial.println((char)0x7E);           //Message End
-
-    ping = millis();
-}
-void instructionUpdate(){
-    // Switching Signal
-    if( state == 2) {
-        
-        switch(instruction[instruction_step][1]){
-            case 0:
-                set_rpm = 0;
-                STOP = true;
-                instruction_step = -1;
-                delay(1000);
-                break;
-            case 1:
-                servo_switch = 0;
-                delay(1000);
-                break;
-            case 2:
-                servo_switch = 1;
-                delay(1000);
-                break;
-                
-        }
-
-        instruction_step++;
-    }
-}
-ISR(PCINT1_vect) {
-    if (digitalRead(motor_enco_1a) == HIGH && enc_prestate)
-        if (digitalRead(motor_enco_1b) == HIGH)
-            enc_count++;
-        else
-            enc_count--;
-    
-    if (digitalRead(motor_enco_1a) == LOW)
-        enc_prestate = true;
-    else
-        enc_prestate = false;
-}
-
+   // Should really check all pairs, but for now we'll just use the first
+   if(str[0] == 197)   //You can change this to the first byte of your tag by finding the card's ID through the Serial Monitor
+   {
+    //Serial.println("\nHello Craig!\n");
+   } 
+   else if(str[0] == 244) //You can change this to the first byte of your tag by finding the card's ID through the Serial Monitor
+   {             
+    //Serial.println("\nHello Erin!\n");
+   }
+   //Serial.println();
+   delay(1000);
+  }
   
-  
-
-
-
+  myRFID.AddicoreRFID_Halt();      //Command tag into hibernation 
+}
