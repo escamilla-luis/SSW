@@ -1,5 +1,4 @@
 // Libraries that will control the servo, the RFID
-#include <AddicoreRFID.h>
 #include <RFID.h>
 #include <SPI.h>
 
@@ -75,7 +74,12 @@ const long interval = 250;
 
 
 // Stores the station number
-long StationId;
+long StationId = 0;
+
+
+// Used to identify which podcar it is
+int vehicle_number = 1;
+
 
  
 void setup()
@@ -106,6 +110,8 @@ void setup()
   RC522.init();
 }
 
+
+
 void loop()
 {
   // Retrieves the state of the button
@@ -127,6 +133,7 @@ void loop()
   // Sets the status of the indicator
   indicator();
 }
+
 
 
 // Retrieves the Station ID
@@ -154,12 +161,14 @@ void getStationID()
 }
 
 
+
 // Checks the status of the button
 void killSwitch()
 {
   // Continuously check the status of the button
   buttonState = digitalRead(BUTTON);
 }
+
 
 
 // Retrieves the readings from the hall effect sensors
@@ -172,6 +181,7 @@ void switchLever()
   // Checks if any magnet is read on the right of podcar
   hall_2_state = digitalRead(HALL_SENSOR2);
 }
+
 
 
 // Function that will return the distance from the ultrasonic sensor
@@ -195,6 +205,7 @@ void ultrasonic()
    // Calculate the distance (in cm) based on the speed of sound
    distance = duration/58.2;
 }
+
 
 
 // Turns on the LED as solid state
@@ -226,14 +237,15 @@ void solidState(int colorState)
 }
   
 
+
 // Blinks the LED red
 void blinkRed()
 {
-  unsigned long currentTime = millis();
+  unsigned long currentRedblink = millis();
 
-  if (currentTime - previousTime >= interval)
+  if (currentRedblink - previousTime >= interval)
   {
-    previousTime = currentTime;
+    previousTime = currentRedblink;
 
     if (redState == OFF)
     {
@@ -254,17 +266,23 @@ void blinkRed()
     digitalWrite(GREEN, greenState);
     digitalWrite(BLUE, blueState);
   }
+  if (currentRedblink > 8000)
+  {
+    buttonState = 1;
+    switch_state = !switch_state;
+  }
 }
+
 
 
 // Blinks the LED blue
 void blinkBlue()
 {
-  unsigned long currentTime = millis();
+  unsigned long currentBlueblink = millis();
 
-  if (currentTime - previousTime >= interval)
+  if (currentBlueblink - previousTime >= interval)
   {
-    previousTime = currentTime;
+    previousTime = currentBlueblink;
 
     if (blueState == OFF)
     {
@@ -285,7 +303,12 @@ void blinkBlue()
     digitalWrite(GREEN, greenState);
     digitalWrite(BLUE, blueState);
   }
+  if (currentBlueblink > 8000)
+  {
+    StationId = 0;
+  }
 }
+
 
 
 // Turns on the LED based on the indicator status
@@ -323,15 +346,10 @@ void indicator()
    // Checks to see if podcar is at a station
    else if (StationId == 35 || StationId == 53 || StationId == 149 || StationId == 132)
    {
-    analogWrite(RED, 0);
-    analogWrite(GREEN, 0);
-    analogWrite(BLUE, 255);
-    delay(250);
-
-    analogWrite(RED, 0);
-    analogWrite(GREEN, 0);
-    analogWrite(BLUE, 0);
-    delay(250);
+    for(int i = 0; i < 10; i++)
+    {
+      blinkBlue();
+    } 
    }
 
    // LED should be green
