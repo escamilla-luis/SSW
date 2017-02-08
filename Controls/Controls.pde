@@ -180,11 +180,12 @@ void draw ()
       // Create statement from connection
       stmt = conn.createStatement();
       stmt.executeUpdate("UPDATE Pods SET status = 200 WHERE pod_num = 1");
+      
     } catch (SQLException e) {
       e.printStackTrace();
     } catch (ClassNotFoundException e) {
       e.printStackTrace();
-    
+    } 
     alreadyRunning = true;
   }
   
