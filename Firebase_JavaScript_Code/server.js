@@ -1,12 +1,22 @@
 var messenger = require('messenger');
 var mysql = require('mysql');
+var firebase = require('firebase');
+
+// Initialize Firebase with our Spartan Superway database information
+var config = {
+	apiKey: "AIzaSyA4tiWKhfsGzygbRWgwfRb76LN4fg7gA5Q",
+	authDomain: "spartan-superway.firebaseapp.com",
+	databaseURL: "https://spartan-superway.firebaseio.com",
+	storageBucket: "spartan-superway.appspot.com",
+};
+firebase.initializeApp(config);
 
 //Setup mySQL connection info
 var con = mysql.createConnection({
 	host:'localhost',
 	user:'root',
 	password:'password',
-	database:'SpartanSuperway'
+	database:'SSW'
 })
 
 //Connect to database
@@ -68,3 +78,15 @@ server2.on('assignRider', function(message, data) {
 //		console.log(data);
 //	});
 //}, 1000);
+
+
+
+var currentTicketRef = firebase.database().ref('users/Qvn71YOfXzMdmASoievQBboMEvI3/currentTicket');
+
+currentTicketRef.on('value', function(snapshot) {
+	var from = snapshot.val().from;
+	var to = snapshot.val().to;
+	console.log(from + "  " + to);
+	con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=1');
+});
+
