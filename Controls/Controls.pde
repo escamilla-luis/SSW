@@ -2,13 +2,8 @@ import processing.serial.*; //<>//
 import processing.net.*;
 import pathfinder.*;
 import java.io.*;
+import java.sql.*;
 
-import javax.script.Invocable;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-
-Client server_socket;
 Serial xbee_comm;
 Car[] vehicle;
 
@@ -165,6 +160,7 @@ void drawinf()
 final String USER = "root";
 final String PASS = "password";
 final String DB_URL = "jdbc:mysql://localhost:3306/SSW";
+final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
 boolean alreadyRunning = false;
 
 // Looping block
@@ -172,7 +168,22 @@ void draw ()
 {
   if (!alreadyRunning) {
     
-    
+    java.sql.Connection conn = null;
+    java.sql.Statement stmt = null;
+    try {
+      // Register JDBC driver
+      Class.forName(JDBC_DRIVER);
+      
+      // Open connection
+      conn = DriverManager.getConnection(DB_URL, USER, PASS);
+      
+      // Create statement from connection
+      stmt = conn.createStatement();
+      stmt.executeUpdate("UPDATE Pods SET status = 200 WHERE pod_num = 1");
+    } catch (SQLException e) {
+      e.printStackTrace();
+    } catch (ClassNotFoundException e) {
+      e.printStackTrace();
     
     alreadyRunning = true;
   }
