@@ -162,48 +162,18 @@ void drawinf()
     }
 }
 
-final String DB_URL = "spartan-superway.firebaseio.com";
+final String USER = "root";
+final String PASS = "password";
+final String DB_URL = "jdbc:mysql://localhost:3306/SSW";
 boolean alreadyRunning = false;
-// Looping block
 
+// Looping block
 void draw ()
 {
   if (!alreadyRunning) {
     
-    try {
     
-      System.out.println("Building Firebase options.");
-      FirebaseOptions options = new FirebaseOptions.Builder()
-      .setServiceAccount(new FileInputStream(dataPath("firebase_service_key.json")))
-      .setDatabaseUrl("https://spartan-superway.firebaseio.com/")
-      .build();
     
-      FirebaseApp.initializeApp(options);
-      
-      // ...or use the equivalent shorthand notation
-      //FirebaseAuth auth = FirebaseAuth.getInstance();
-      FirebaseDatabase database = FirebaseDatabase.getInstance();
-      
-      database.getReference().child("asdf").child("firstName").setValue("Tester test");
-      
-    } catch(FileNotFoundException e) {
-      e.printStackTrace();
-    }
-    
-      
-  //  ScriptEngineManager manager = new ScriptEngineManager();
-  //  ScriptEngine engine = manager.getEngineByName("JavaScript");
-    
-  //  String script = "function hello(name) { print('Hello, ' + name); }";
-  //  try {
-  //    engine.eval(script);
-  //    Invocable inv = (Invocable) engine;
-  //    inv.invokeFunction("hello", "Spartan Superway" );
-  //  } catch (ScriptException e) {
-  //    e.printStackTrace();
-  //  } catch (NoSuchMethodException e) {
-  //    e.printStackTrace();
-  //  }
     alreadyRunning = true;
   }
   
