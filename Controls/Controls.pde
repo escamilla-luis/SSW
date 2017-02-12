@@ -70,13 +70,13 @@ void setup()
     printArray(Serial.list());
 
     // Try to connect to serial port, if unavailable throw error
-    try { 
-        xbee_comm = new Serial(this, Serial.list()[0], 57600);
-        xbee_comm.bufferUntil('\n');
-    } 
-    catch (IndexOutOfBoundsException e) {
-        System.err.println("IndexOutOfBoundsException: " + e.getMessage());
-    }
+    //try { 
+    //    xbee_comm = new Serial(this, Serial.list()[0], 57600);
+    //    xbee_comm.bufferUntil('\n');
+    //} 
+    //catch (IndexOutOfBoundsException e) {
+    //    System.err.println("IndexOutOfBoundsException: " + e.getMessage());
+    //}
 
     // Initialize array for 10 vehicles
     vehicle = new Car[10];
@@ -157,9 +157,9 @@ void drawinf()
     }
 }
 
-final String USER = "root";
-final String PASS = "password";
-final String DB_URL = "jdbc:mysql://localhost:3306/SSW";
+final String USER = "timmahwork";
+final String PASS = "";
+final String DB_URL = "jdbc:mysql://localhost:3306/podStatus";
 final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
 boolean alreadyRunning = false;
 
@@ -179,7 +179,7 @@ void draw ()
       
       // Create statement from connection
       stmt = conn.createStatement();
-      stmt.executeUpdate("UPDATE Pods SET status = 200 WHERE pod_num = 1");
+      stmt.executeUpdate("UPDATE pods SET status = 200 WHERE pod_num = 1");
       
     } catch (SQLException e) {
       e.printStackTrace();

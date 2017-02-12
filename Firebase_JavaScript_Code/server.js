@@ -14,17 +14,17 @@ firebase.initializeApp(config);
 //Setup mySQL connection info
 var con = mysql.createConnection({
 	host:'localhost',
-	user:'root',
-	password:'password',
+	user:'timmahwork',
+	password:'',
 	database:'SSW'
-})
+});
+
+var currentUsers = getCurrentUsers();
+//console.log(currentTickets);
 
 //Connect to database
 con.connect(function(err){
-	if(err) {
-		console.log('Error connecting to Database')
-		return;
-	}
+	if(err) throw error;
 	console.log('Connection established...')
 })
  
@@ -87,6 +87,40 @@ currentTicketRef.on('value', function(snapshot) {
 	var from = snapshot.val().from;
 	var to = snapshot.val().to;
 	console.log(from + "  " + to);
-	con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=1');
+	setDestination(1,from,to);
+	//con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=1');
 });
+
+//set destination for a pod
+function setDestination(podnum,from,to) {
+	con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=' +podnum);
+}
+
+
+//get an array of current tickets
+function getCurrentUsers() {
+	var Users = [];
+	
+	usersStart = firebase.database().ref('users');
+
+	usersStart.on('value', function(snapshot) {
+
+		for (var i = Object.keys(snapshot.val()).length - 1; i >= 0; i--) {
+			console.log('before'+Object.keys(snapshot.val())[i]);
+			Users.push(Object.keys(snapshot.val())[i]);
+			console.log('after'+Users);
+		};
+
+		console.log('final result'+Users);
+
+		return Users;
+
+	})
+
+	
+
+	
+}
+
+//con.end();
 
