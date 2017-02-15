@@ -1,6 +1,7 @@
 var messenger = require('messenger');
 var mysql = require('mysql');
 var firebase = require('firebase');
+var mysqlEvents = require('mysql-events');
 
 // Initialize Firebase with our Spartan Superway database information
 var config = {
@@ -19,6 +20,12 @@ var con = mysql.createConnection({
 	database:'SSW'
 })
 
+var dsn = {
+	host:     'localhost',
+	user:     'root',
+	password: 'password'
+};
+
 //Connect to database
 con.connect(function(err){
 	if(err) {
@@ -27,58 +34,34 @@ con.connect(function(err){
 	}
 	console.log('Connection established...')
 })
- 
-//Create server listening on port 8000
-server1 = messenger.createListener(8000);
 
+//Indexed array to hold ticket ID for pod based on pod_num 
+var podSchedule  = [1234,-1,-1,-1, -1, -1];
+console.log(podSchedule);
 //Create server listening on port 8001
-server2 = messenger.createListener(8001);
- 
-//Set up action to be taking on 'give it to me' request from client
-server1.on('give it to me', function(message, data){
-	console.log('message recieved');
-	message.reply({'you':'got it'});
+server1 = messenger.createListener(8001);
+
+server1.on("assignTicket" , function(message, data) {
+	var pod_num = data.pod_num - 1;
+		console.log(pod_num);
+	if (podSchedule[pod_num] != -1) {
+		message.reply(podSchedule[pod_num]);
+	}
+	var podText = "";
+	for (var i = 0; i < podSchedule.length; i++) {
+	 podText += podSchedule[i] + ",";
+	}
+	console.log(podSchedule);
 });
 
-//Set action to be taken on 'info' request
-//data is data sent from client 
-server2.on('info', function(message, data){
-	var pod = data.pod;
-	console.log('Request from '+pod+' recieved...')
-	con.query('SELECT location FROM SpartanSuperway.location WHERE pod='+ pod +';', function(err, rows) {
-		if (err) {
-			console.log(err);
-		} else {
-			//returns information to the client
-			message.reply(rows);
-		}
-	});
+server1.on("updatePodSchedule", function(message, data){
+	var pod_num = data.pod_num - 1;
+	var busy = data.busy;
+	if (!busy) {
+		podSchedule[pod_num] = -1;
+		message.reply("Updated to Inactive");
+	}
 });
-
-//Set action to be taken on 'setLocation'
-server2.on('setLocation', function(message, data) {
-	var pod = data.pod
-	var location = data.location
-	//Update locationin MySQL
-	con.query('UPDATE location SET location ='+ data.location +' WHERE pod='+ data.pod);
-	message.reply(location);
-});
- 
-//Set action to be taken for 'assignRier;
-server2.on('assignRider', function(message, data) {
-	var pod = data.pod
- 	console.log(data.rider)
-	//Update rider in mySQL for given pod
-	con.query('UPDATE podAssignment SET rider = \'' + data.rider + '\' WHERE pod = ' + data.pod);
-	//Return success to client
-	message.reply('Success');
-});
-//setInterval(function(){
-//	client.request('give it to me', {hello:'world'}, function(data){
-//		console.log(data);
-//	});
-//}, 1000);
-
 
 
 var currentTicketRef = firebase.database().ref('users/Qvn71YOfXzMdmASoievQBboMEvI3/currentTicket');

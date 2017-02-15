@@ -54,46 +54,36 @@ database.ref('12345').set({
 	randomNumbers: "1295500129385123010238"
 });
 
-var podNum = 1;
+var client = messenger.createSpeaker(8001);
+var pod_num = 1
+var isBusy = false;
 
-//Set up client to speak on port 8001
-client1 = messenger.createSpeaker(8001);
+setInterval(function() {
 
-//Sets an interval to request the information from the server every 1 second
-setInterval(function(){
-	if (loc <=100) { loc++; }
-	else { loc = 0; }
-	//Request takes 3 parameters
-	//Message name - this is how the server recognizes what request to process by name
-	//JSON data  - Information for server to use 
-	//Function(data) - data is info returned and can process in function call
-	client1.request('assignRider', {rider: userId, pod: podNum}, function(data) {
-//		console.log('user updated');
-	});
-}, 1000);
-
-//client1.request('assignRider', {rider: userId, pod: podNum}, function(data) {
-//	console.log('user updated');
-//});
-
-
-var loc = 0;
-
-//Request to server using 'setLocation' identifier to update car location on server then send it back and update firebase.
-setInterval(function(){
-	if (loc <=100) { loc++; }
-	else { loc = 0; }
-	client1.request('setLocation', {location: loc, pod: podNum}, function(data) {
-	var mutableTicketRef = database.ref("users").child(userId).child("currentTicket").child("eta");
-	var mutableEtaRef = mutableTicketRef.child("eta");
-	mutableEtaRef.set(data.location);
-	
-	});
-}, 1000);
-
-//Request 'info' 
-setInterval(function(){
-	client1.request('info', {pod: podNum}, function(data){
-		console.log(data);
-	});
-}, 1000);
+	if (!isBusy) {
+		console.log("requesting...");		
+		client.request('assignTicket', {pod_num: pod_num}, function(firebaseUserId) {
+			console.log()
+			isBusy = true;
+			var time = 10;
+			
+			var updatePodInterval = setInterval(function () {
+				
+				if (time >= 0) {
+					
+					console.log(time);
+					time = time - 1;
+				} else {
+					console.log("requesting server to update pod status");
+					client.request('updatePodSchedule', {pod_num: pod_num, isBusy: false}, function(message) {
+						if (message) {
+							console.log(message);
+							isBusy = false;
+						}
+					});
+					clearInterval(updatePodInterval);
+				}
+			}, 1000);
+		});
+	}
+}, 2000);
