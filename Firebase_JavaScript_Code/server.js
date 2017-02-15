@@ -19,7 +19,7 @@ var con = mysql.createConnection({
 	database:'SSW'
 });
 
-var currentUsers = getCurrentUsers();
+var currentUsers = getCurrentTickets();
 //console.log(currentTickets);
 
 //Connect to database
@@ -98,29 +98,54 @@ function setDestination(podnum,from,to) {
 
 
 //get an array of current tickets
-function getCurrentUsers() {
+function getCurrentTickets() {
 	var Users = [];
+	var tickets = [];
 	
 	usersStart = firebase.database().ref('users');
 
+	//first start by getting the array of users
 	usersStart.on('value', function(snapshot) {
 
 		for (var i = Object.keys(snapshot.val()).length - 1; i >= 0; i--) {
-			console.log('before'+Object.keys(snapshot.val())[i]);
+			
 			Users.push(Object.keys(snapshot.val())[i]);
-			console.log('after'+Users);
+			//console.log(Object.keys(snapshot.val())[i]);
+			
 		};
 
-		console.log('final result'+Users);
+		//then get the array of tickets
+		for (var i = Users.length - 1; i >= 0; i--) {
+			var ticketStart = firebase.database().ref('users/'+Users[i]+'/currentTicket');
 
-		return Users;
+			ticketStart.on('value', function(snapshot) {
+				//console.log(snapshot.val());
+				tickets.push(snapshot.val());
+			})
+		};
+
+		console.log(tickets);
+
+		return tickets;
 
 	})
-
-	
-
 	
 }
+
+//get an array of tickets and their from/to values
+// function getCurrentTickets() {
+// 	var Users = [];
+// 	console.log('see me');
+// 	while(typeof Users === null){
+// 		console.log(Users);
+// 		Users = getCurrentUsers();
+// 	};
+
+// 	for (var i = Users.length - 1; i >= 0; i--) {
+// 		var currentTicket = firebase.database().ref('users/'+ Users[i] + '/currentTicket');
+// 		console.log(currentTicket);
+// 	};
+// }
 
 //con.end();
 
