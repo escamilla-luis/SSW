@@ -1,6 +1,8 @@
-// Libraries that will control the servo, the RFID
+// Libraries for the RFID and for the motors
 #include <RFID.h>
 #include <SPI.h>
+#include <TimerThree.h>
+
 
 
 // Pin definitions
@@ -8,14 +10,17 @@
 /* Note: For RFID reader - SDA (PIN 9), SCK (PIN 52), MOSI (PIN 51),
  *  MISO (PIN 50), RST (PIN 8).
  */
-#define RED             2   // STOP and Error status
-#define GREEN           3   // GO status
-#define BLUE            4   // Status of the podcar
+#define motor1          2
+#define motor2          3
+#define RED             10  // STOP and Error status
+#define GREEN           11  // GO status
+#define BLUE            12  // Status of the podcar
 #define ECHO            22  // Echo pin
 #define TRIG            23  // Trig pin
-#define BUTTON          24  // Kill switch
-#define HALL_SENSOR1    25  // Switch servo motor using hall effect sensor mounted on left of podcar
-#define HALL_SENSOR2    26  // Switch servo motor using hall effect sensor mounted on right of podcar
+#define KILL_SWITCH     24  // Kill switch
+#define RESET           25  // Resets the system after error status has been acknowledged
+#define HALL_SENSOR1    26  // Switch servo motor using hall effect sensor mounted on left of podcar
+#define HALL_SENSOR2    27  // Switch servo motor using hall effect sensor mounted on right of podcar
 
 
 // For button state
@@ -38,18 +43,20 @@ RFID RC522(SDA_DIO, RESET_DIO);
 
 
 // Latching button using software
-boolean switch_state = true;
+boolean kill_latch_state = true;
+boolean reset_latch_state = true;
 
 
-// Stores the state of the button
-int buttonState;
+// Stores the state of each button
+int kill_state;
+int reset_state;
 
 
 // Used for the ultrasonic sensor
-int maximumRange = 200;   // Maximum range needed
-int minimumRange = 0;     // Minimum range needed
-long duration;            // Duration used to calculate distance
-int distance;             // Stores the distance
+int maximumRange = 200;       // Maximum range needed
+int minimumRange = 0;         // Minimum range needed
+long duration;                // Duration used to calculate distance
+int distance;                 // Stores the distance
 
 
 // Variables used to store the readings from the hall effect sensors
@@ -63,18 +70,19 @@ int hall_2_state;
 
 
 // Used for LED purposes
-#
 int redState = OFF;       // Initially, all LED states should be off
 int greenState = OFF;
 int blueState = OFF;
 
 
-unsigned long previousTime = 0;
+unsigned long previousRed = 0;
+unsigned long previousBlue = 0;
 const long interval = 250;
 
 
 // Stores the station number
-long StationId = 0;
+int  StationId = 0;
+long SSN = 0;
 
 
 // Used to identify which podcar it is
@@ -85,6 +93,8 @@ int vehicle_number = 1;
 void setup()
 {
   // Outputs
+  pinMode(motor1, OUTPUT);
+  pinMode(motor2, OUTPUT);
   pinMode(TRIG, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
@@ -93,13 +103,23 @@ void setup()
 
   // Inputs
   pinMode(ECHO, INPUT);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(KILL_SWITCH, INPUT_PULLUP);
+  pinMode(RESET, INPUT_PULLUP);
   pinMode(HALL_SENSOR1, INPUT);
   pinMode(HALL_SENSOR2, INPUT);
+
+
+  // Set TimerThree to signal at 20Hz frequency (20 times/sec)
+  Timer3.initialize(1000000 / 1000);
 
   
   // Change this to 57600 for Xbee Comm
   Serial.begin(9600);
+
+
+  // Start timer3 PWM for motors
+  Timer3.pwm(motor1, 0);
+  Timer3.pwm(motor2, 0);
 
 
   /* Initialize the RFID reader */
@@ -113,31 +133,37 @@ void setup()
 
 
 void loop()
-{
-  // Retrieves the state of the button
-  killSwitch();
+{ 
+  // Checks on the state of the kill button
+  killState();
 
 
   // Function that will check to see if any of the hall effect sensors read a magnet
-  switchLever();
+  magnetRead();
 
 
   // Retrieves the station that the podcar is at if a tag is read
-  getStationID();
+  getStationNumber();
 
 
-  // Retrieves the distance from the ultrasonic sensor
+  // Retrieves the distance from the ultrasonic sensor and returns the state of the collision
+  // detection system
   ultrasonic();
+  isSomethingInFront();
 
 
-  // Sets the status of the indicator
-  indicator();
+  // Retrieves the state of the RGB LED
+  getStateLED();
+  
+
+  // System controls
+  controls();
 }
 
 
 
 // Retrieves the Station ID
-void getStationID()
+int getStationNumber()
 {
   /* Has a card been detected? */
   if (RC522.isCard())
@@ -147,14 +173,39 @@ void getStationID()
 
 
     /* Display the Serial number of the tag */
-    Serial.println("Card detected:");
+    Serial.println("Podcar is at station:");
 
 
     for (int i = 0; i < 1; i++)
     {
-      StationId = RC522.serNum[i];
-      Serial.print(StationId, DEC);
+      SSN = RC522.serNum[i];
     }
+
+    if (SSN == 35)
+    {
+      StationId = 1;
+      return StationId;
+    }
+
+    if (SSN == 110)
+    {
+      StationId = 2;
+      return StationId;
+    }
+
+    if (SSN == 103)
+    {
+      StationId = 3;
+      return StationId;
+    }
+
+    if (SSN == 132)
+    {
+      StationId = 4;
+      return StationId;
+    }
+
+    Serial.print(StationId);
     Serial.println();
   }
   delay(50);
@@ -162,17 +213,25 @@ void getStationID()
 
 
 
-// Checks the status of the button
-void killSwitch()
+// Sets the next station number
+void setNextStationNumber(int station_number)
 {
-  // Continuously check the status of the button
-  buttonState = digitalRead(BUTTON);
+  
+}
+
+
+
+// Checks the status of the button
+void killState()
+{
+  // Continuously check the status of the kill button
+  kill_state  = digitalRead(KILL_SWITCH);
 }
 
 
 
 // Retrieves the readings from the hall effect sensors
-void switchLever()
+void magnetRead()
 {
   // Checks if any magnet is read on the left of podcar
   hall_1_state = digitalRead(HALL_SENSOR1);
@@ -208,10 +267,31 @@ void ultrasonic()
 
 
 
-// Turns on the LED as solid state
-void solidState(int colorState)
+// Detects if anything is in front of the podcar
+boolean isSomethingInFront()
 {
-  // LED is red
+  boolean collision_detection;
+  
+  if(distance <= 15)
+  {
+    collision_detection = true;
+  }
+
+  else
+  {
+    collision_detection = false; 
+  }
+
+  return collision_detection;
+}
+
+
+
+
+// Turns on the LED based on one of the specified states
+void setStateLED(int colorState)
+{
+  // LED is red (Station arrival or collision prevention)
   if (colorState == 1)
   {
     digitalWrite(RED, ON);
@@ -219,7 +299,7 @@ void solidState(int colorState)
     digitalWrite(BLUE, OFF);
   }
 
-  // LED is blue
+  // LED is blue (checkpoint detected)
   if (colorState == 2)
   {
     digitalWrite(RED, OFF);
@@ -227,138 +307,162 @@ void solidState(int colorState)
     digitalWrite(BLUE, ON);
   }
 
-  // LED is green
+  // LED is green (podcar in motion)
   if (colorState == 3)
   {
     digitalWrite(RED, OFF);
     digitalWrite(GREEN, ON);
     digitalWrite(BLUE, OFF);
   }
+
+  // LED is blinking red (error)
+  if (colorState == 4)
+  {
+    unsigned long currentRedblink = millis();
+
+    if (currentRedblink - previousRed >= interval)
+    {
+      previousRed = currentRedblink;
+
+      if (redState == OFF)
+      {
+        redState = ON;
+        greenState = OFF;
+        blueState = OFF;
+      }
+
+      else
+      {
+        redState = OFF;
+        greenState = OFF;
+        blueState = OFF;
+      }
+
+      // Set the state of the LED
+      digitalWrite(RED, redState);
+      digitalWrite(GREEN, greenState);
+      digitalWrite(BLUE, blueState);
+    }
+    
+    // Checks to see if the reset button has been pressed
+    reset_state = digitalRead(RESET);
+
+    // Resets the LED to green and returns the states of each button to default values
+    if(reset_state < 1)
+    {
+      reset_latch_state = false;
+      kill_latch_state = true;
+    }
+    else if(kill_state < 1)
+    {
+      kill_latch_state = false;
+      reset_latch_state = true;
+    }
+  }
 }
-  
 
 
-// Blinks the LED red
-void blinkRed()
+
+// Gets the state of the LED
+// Used for mobile app purposes
+int getStateLED()
 {
-  unsigned long currentRedblink = millis();
-
-  if (currentRedblink - previousTime >= interval)
+  if(digitalRead(RED) == 1)            // Red LED is on
   {
-    previousTime = currentRedblink;
-
-    if (redState == OFF)
-    {
-      redState = ON;
-      greenState = OFF;
-      blueState = OFF;
-    }
-
-    else
-    {
-      redState = OFF;
-      greenState = OFF;
-      blueState = OFF;
-    }
-
-    // Set the state of the LED
-    digitalWrite(RED, redState);
-    digitalWrite(GREEN, greenState);
-    digitalWrite(BLUE, blueState);
+    return 1;                          // 1 status is for podcar has stopped
   }
-  if (currentRedblink > 8000)
+
+  else if(digitalRead(GREEN) == 1)     // Green LED is on
   {
-    buttonState = 1;
-    switch_state = !switch_state;
+    return 3;                          // 2 status is for podcar in motion
+  }
+
+  else if(digitalRead(BLUE) == 1)      // Blue LED is on
+  {
+    return 2;                          // 3 status if successful checkpoint reading
+  }
+
+  else 
+  {
+    return 4;                          // 4 status is for error (red flashing) 
   }
 }
 
 
 
-// Blinks the LED blue
-void blinkBlue()
-{
-  unsigned long currentBlueblink = millis();
-
-  if (currentBlueblink - previousTime >= interval)
-  {
-    previousTime = currentBlueblink;
-
-    if (blueState == OFF)
-    {
-      redState = OFF;
-      greenState = OFF;
-      blueState = ON;
-    }
-
-    else
-    {
-      redState = OFF;
-      greenState = OFF;
-      blueState = OFF;
-    }
-
-    // Set the state of the LED
-    digitalWrite(RED, redState);
-    digitalWrite(GREEN, greenState);
-    digitalWrite(BLUE, blueState);
-  }
-  if (currentBlueblink > 8000)
-  {
-    StationId = 0;
-  }
-}
-
-
-
-// Turns on the LED based on the indicator status
-void indicator()
+// Function that controls the functions of the system
+void controls()
 {
      // Changed distance from 30 cm to 15 cm due to pole obstacle
    // LED is Red when statement is true
    if (distance <= 15)
    {
-    solidState(1);
+    setStateLED(1);
+    setSpeedOfMotors(0);
    }
 
    // LED is blinking red if button is pressed
-   else if (buttonState < 1)
+   else if (kill_state < 1)
    {
     // Creates a latching button
-    switch_state = !switch_state;
+    kill_latch_state = false;
+    reset_latch_state = true;
 
-    // Blinks the LED red
-    do
-    {
-      blinkRed();
-    }
-    // Continues to blink while latching button is in effect
+    // Continues to blink the LED red while latching button is in effect
     // Only way to stop this cycle is to reset Arduino or add another button
-    while(switch_state == false);
+    while(kill_latch_state == false && reset_latch_state == true)
+    {
+      setStateLED(4);
+      setSpeedOfMotors(0);
+    }
    }
 
    // Checks to see if the hall effect sensor on the left of podcar read a magnet
    else if (hall_1_state == 0 || hall_2_state == 0)
    {
-    solidState(2);
-   }
+    setStateLED(2);
+    setSpeedOfMotors(800);
+   } 
 
    // Checks to see if podcar is at a station
-   else if (StationId == 35 || StationId == 53 || StationId == 149 || StationId == 132)
+   else if (StationId == 1 || StationId == 2 || StationId == 3 || StationId == 4)
    {
-    for(int i = 0; i < 10; i++)
-    {
-      blinkBlue();
-    } 
+    setStateLED(1); 
+    setSpeedOfMotors(0);
    }
 
    // LED should be green
    else
    {
-    solidState(3);
+    setStateLED(3);
+    setSpeedOfMotors(800);
    }
    
    // delay 50 ms before next reading
    delay(50);  
 }
 
+
+
+// Function that sets the speed of the motors
+void setSpeedOfMotors(double motor_speed)
+{
+  Timer3.pwm(motor1, motor_speed);
+  Timer3.pwm(motor2, motor_speed);
+}
+
+
+
+// Retrieves the speed of the motor based on the encoders
+double getSpeedOfMotors()
+{
+  
+}
+
+
+
+// Function to send all requested information through Xbee??
+void sendXbee()
+{
+  
+}
