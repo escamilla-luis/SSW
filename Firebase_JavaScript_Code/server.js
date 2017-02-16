@@ -12,64 +12,102 @@ var config = {
 };
 firebase.initializeApp(config);
 
-//Setup mySQL connection info
-var con = mysql.createConnection({
-	host:'localhost',
-	user:'root',
-	password:'password',
-	database:'SSW'
-})
+// MySQL database stuff
+//var con = mysql.createConnection({
+//	host:'localhost',
+//	user:'root',
+//	password:'password',
+//	database:'SSW'
+//})
+//
+//var dsn = {
+//	host:     'localhost',
+//	user:     'root',
+//	password: 'password'
+//};
+//
+//con.connect(function(err){
+//	if(err) {
+//		console.log('Error connecting to Database')
+//		return;
+//	}
+//	console.log('Connection established...')
+//})
 
-var dsn = {
-	host:     'localhost',
-	user:     'root',
-	password: 'password'
+
+// Server/Client code
+
+var speaker1 = messenger.createSpeaker(8001);
+var speaker2 = messenger.createSpeaker(8002);
+var speaker3 = messenger.createSpeaker(8003);
+var speaker4 = messenger.createSpeaker(8004);
+
+var podSchedule = [-1, -1, -1, -1];
+
+// This callback gets executed when the client sends the server a reply 
+// letting it know that it's task is completed
+var clientCallback = function (clientNumber, clientStatus) {
+	
+	console.log("Client number: " + clientNumber);
+	console.log("Client status: " + clientStatus);
+	
+	// Update podSchedule
+	podSchedule[clientNumber] = clientStatus;
 };
 
-//Connect to database
-con.connect(function(err){
-	if(err) {
-		console.log('Error connecting to Database')
-		return;
-	}
-	console.log('Connection established...')
-})
+function assignTicketToClient(firebaseUserId, clientNumber) {
+	
+	var data = {firebaseUserId: firebaseUserId}
+	
+	switch (clientNumber) {
+		case 1:
+			speaker1.request('assignTicket', data, clientCallback);
+			break;
+		case 2:
+			speaker2.request('assignTicket', data, clientCallback);
+			break;
+		case 3:
+			speaker3.request('assignTicket', data, clientCallback);
+			break;
+		case 4:
+			speaker4.request('assignTicket', data, clientCallback);
+			break;
+		default:
+			console.log('Error: Invalid client number specified');
+	}	
+}
 
-//Indexed array to hold ticket ID for pod based on pod_num 
-var podSchedule  = [1234,-1,-1,-1, -1, -1];
-console.log(podSchedule);
-//Create server listening on port 8001
-server1 = messenger.createListener(8001);
+assignTicketToClient("userIdTest", 1);
 
-server1.on("assignTicket" , function(message, data) {
-	var pod_num = data.pod_num - 1;
-		console.log(pod_num);
-	if (podSchedule[pod_num] != -1) {
-		message.reply(podSchedule[pod_num]);
-	}
-	var podText = "";
-	for (var i = 0; i < podSchedule.length; i++) {
-	 podText += podSchedule[i] + ",";
-	}
-	console.log(podSchedule);
-});
+// Gets an array of current tickets from Firebase
+function getCurrentTickets() {
+	var users = [];
+	var tickets = [];
+	
+	usersStart = firebase.database().ref('users');
 
-server1.on("updatePodSchedule", function(message, data){
-	var pod_num = data.pod_num - 1;
-	var busy = data.busy;
-	if (!busy) {
-		podSchedule[pod_num] = -1;
-		message.reply("Updated to Inactive");
-	}
-});
+	//first start by getting the array of users
+	usersStart.on('value', function(snapshot) {
 
+		for (var i = Object.keys(snapshot.val()).length - 1; i >= 0; i--) {
+			
+			users.push(Object.keys(snapshot.val())[i]);
+			//console.log(Object.keys(snapshot.val())[i]);
+			
+		};
 
-var currentTicketRef = firebase.database().ref('users/Qvn71YOfXzMdmASoievQBboMEvI3/currentTicket');
+		//then get the array of tickets
+		for (var i = users.length - 1; i >= 0; i--) {
+			var ticketStart = firebase.database().ref('users/' + users[i]+'/currentTicket');
 
-currentTicketRef.on('value', function(snapshot) {
-	var from = snapshot.val().from;
-	var to = snapshot.val().to;
-	console.log(from + "  " + to);
-	con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=1');
-});
+			ticketStart.on('value', function(snapshot) {
+				//console.log(snapshot.val());
+				tickets.push(snapshot.val());
+			});
+		};
+
+		console.log(tickets);
+		return tickets;
+	});
+}
 
