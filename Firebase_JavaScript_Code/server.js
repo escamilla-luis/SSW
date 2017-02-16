@@ -56,6 +56,9 @@ var clientCallback = function (data) {
 	podSchedule[data.podNumber] = data.podStatus;
 };
 
+// We can call this function here when there is a new ticket to deal
+// with from Firebase. The eventListener on Firebase will provide us
+// the userId. From there we can provide this function the available client #
 function assignTicketToClient(firebaseUserId, clientNumber) {
 	
 	var data = {firebaseUserId: firebaseUserId}

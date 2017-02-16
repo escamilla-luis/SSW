@@ -4,9 +4,8 @@ var firebase = require('firebase');
 var PORT = 8002;
 var POD_NUM = 2;
 
-client = messenger.createListener(PORT);
+var client = messenger.createListener(PORT);
 
-console.log("client.on(...)");
 client.on('assignTicket', function(message, data) {
     
     var firebaseUserId = data.firebaseUserId;
