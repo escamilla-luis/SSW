@@ -31,13 +31,13 @@ void setup() {
  
   // start the SPI library:
   SPI.begin();
-  
+  pinMode(3, OUTPUT);
+  pinMode(4, OUTPUT);
   pinMode(chipSelectPin,OUTPUT);              // Set digital pin 10 as OUTPUT to connect it to the RFID /ENABLE pin 
     digitalWrite(chipSelectPin, LOW);         // Activate the RFID reader
   pinMode(NRSTPD,OUTPUT);                     // Set digital pin 10 , Not Reset and Power-down
     digitalWrite(NRSTPD, HIGH);
 
- Wire.onRequest(requestStation); //Calls function to send StationId to Master Arduino
 
   myRFID.AddicoreRFID_Init();  
 }
@@ -109,6 +109,11 @@ void loop()
               StationId=1;
               Serial.print("StationId: \t\t");
               Serial.print(StationId);
+              
+              digitalWrite(3, HIGH);
+              digitalWrite(4, LOW);
+              
+            }
             
             }
             if(checksum1==94)
@@ -116,8 +121,12 @@ void loop()
               StationId=2;
               Serial.print("StationId: \t\t");
               Serial.print(StationId);
-              
+          
+              digitalWrite(4,HIGH);
+              digitalWrite(3, LOW);
+            
             }
+            
             
             
             // Should really check all pairs, but for now we'll just use the first
@@ -131,9 +140,8 @@ void loop()
             delay(1000);
 	}
 		
-        myRFID.AddicoreRFID_Halt();		   //Command tag into hibernation              
 
-}
+
 
 
 void requestStation()
