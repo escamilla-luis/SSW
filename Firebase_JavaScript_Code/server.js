@@ -77,8 +77,6 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 	}	
 }
 
-assignTicketToClient("userIdTest", 1);
-
 // Gets an array of current tickets from Firebase
 function getCurrentTickets() {
 	var users = [];
