@@ -1,8 +1,8 @@
 var messenger = require('messenger');
 var firebase = require('firebase');
 
-var PORT = 8002;
-var POD_NUM = 2;
+var PORT = 8003;
+var POD_NUM = 3;
 
 client = messenger.createListener(PORT);
 

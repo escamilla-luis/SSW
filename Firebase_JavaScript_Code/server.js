@@ -46,13 +46,14 @@ var podSchedule = [-1, -1, -1, -1];
 
 // This callback gets executed when the client sends the server a reply 
 // letting it know that it's task is completed
-var clientCallback = function (clientNumber, clientStatus) {
+var clientCallback = function (data) {
 	
-	console.log("Client number: " + clientNumber);
-	console.log("Client status: " + clientStatus);
+	console.log("Client replied!")
+	console.log("podNumber: " + data.podNumber);
+	console.log("podStatus: " + data.podStatus);
 	
-	// Update podSchedule
-	podSchedule[clientNumber] = clientStatus;
+	// Update pod schedule
+	podSchedule[data.podNumber] = data.podStatus;
 };
 
 function assignTicketToClient(firebaseUserId, clientNumber) {
@@ -61,6 +62,7 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 	
 	switch (clientNumber) {
 		case 1:
+			console.log("speaker1.request()");
 			speaker1.request('assignTicket', data, clientCallback);
 			break;
 		case 2:
@@ -76,6 +78,20 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 			console.log('Error: Invalid client number specified');
 	}	
 }
+
+// Demo code that will send each client 'userId' every 2 seconds.
+var userId = 1234;
+var podNumber = 1;
+setInterval(function() {
+	assignTicketToClient(userId, podNumber);
+	
+	userId = userId + 1;	
+	podNumber = podNumber + 1;
+	if (podNumber > 4) {
+		podNumber = 1;
+	}
+}, 2000);
+
 
 // Gets an array of current tickets from Firebase
 function getCurrentTickets() {
