@@ -113,11 +113,11 @@ function listenForTickets() {
 					var userId = snapshot.key;
 					console.log('userId: ' + userId);
 
-					var isTicketAlive = snapshot.child('currentTicket').child('alive').val();
-					console.log('isTicketAlive: ' + isTicketAlive);
+					var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
+					console.log('isNewTicket: ' + isNewTicket);
 
-					if (isTicketAlive == true) {
-						console.log('Ticket is active!');
+					if (isNewTicket == true) {
+						console.log('Ticket is new!');
 						
 						// TEST - Send request to client 1 if it's not busy
 						if (!isClientBusy) {
