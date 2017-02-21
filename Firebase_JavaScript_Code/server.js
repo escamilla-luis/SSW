@@ -114,10 +114,12 @@ function listenForTickets() {
 					console.log('userId: ' + userId);
 
 					var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
-					console.log('isNewTicket: ' + isNewTicket);
-
 					if (isNewTicket == true) {
 						console.log('Ticket is new!');
+						
+						// Handle ticket here
+						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
+						mutableTicketRef.child('isNewTicket').set(false);
 						
 						// TEST - Send request to client 1 if it's not busy
 						if (!isClientBusy) {
@@ -125,7 +127,7 @@ function listenForTickets() {
 						}
 					
 						// Do something relevant with userId...
-						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
+
 						var mutableEtaRef = mutableTicketRef.child('eta');
 						var mutableStatusRef = mutableTicketRef.child('status');
 					} 
