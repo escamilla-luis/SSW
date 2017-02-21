@@ -83,48 +83,57 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 }
 
 // Demo code that will send each client 'userId' every 2 seconds.
-var userId = 1234;
-var podNumber = 1;
-setInterval(function() {
-	assignTicketToClient(userId, podNumber);
+//var userId = 1234;
+//var podNumber = 1;
+//setInterval(function() {
+//	assignTicketToClient(userId, podNumber);
+//	
+//	userId = userId + 1;	
+//	podNumber = podNumber + 1;
+//	if (podNumber > 4) {
+//		podNumber = 1;
+//	}
+//}, 2000);
+
+
+var isClientBusy = false;
+// Firebase stuff
+var database = firebase.database();
+
+// Function that sets listener on each user (individually)
+function listenForTickets() {
 	
-	userId = userId + 1;	
-	podNumber = podNumber + 1;
-	if (podNumber > 4) {
-		podNumber = 1;
-	}
-}, 2000);
+	var usersRef = database.ref('users');
+	usersRef.once('value')
+		.then(function(users) {
+			users.forEach(function(user) {
+				usersRef.child(user.key).on('value', function(snapshot) {
+					
+					// Only perform something relevant on ticket if 'isTicketAlive' == true
+					var userId = snapshot.key;
+					console.log('userId: ' + userId);
 
+					var isTicketAlive = snapshot.child('currentTicket').child('alive').val();
+					console.log('isTicketAlive: ' + isTicketAlive);
 
-// Gets an array of current tickets from Firebase
-function getCurrentTickets() {
-	var users = [];
-	var tickets = [];
-	
-	usersStart = firebase.database().ref('users');
-
-	//first start by getting the array of users
-	usersStart.on('value', function(snapshot) {
-
-		for (var i = Object.keys(snapshot.val()).length - 1; i >= 0; i--) {
-			
-			users.push(Object.keys(snapshot.val())[i]);
-			//console.log(Object.keys(snapshot.val())[i]);
-			
-		};
-
-		//then get the array of tickets
-		for (var i = users.length - 1; i >= 0; i--) {
-			var ticketStart = firebase.database().ref('users/' + users[i]+'/currentTicket');
-
-			ticketStart.on('value', function(snapshot) {
-				//console.log(snapshot.val());
-				tickets.push(snapshot.val());
+					if (isTicketAlive == true) {
+						console.log('Ticket is active!');
+						
+						// TEST - Send request to client 1 if it's not busy
+						if (!isClientBusy) {
+							assignTicketToClient(userId, 1);
+						}
+					
+						// Do something relevant with userId...
+						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
+						var mutableEtaRef = mutableTicketRef.child('eta');
+						var mutableStatusRef = mutableTicketRef.child('status');
+					} 
+					
+				});
 			});
-		};
-
-		console.log(tickets);
-		return tickets;
-	});
+		});
 }
+
+listenForTickets();
 

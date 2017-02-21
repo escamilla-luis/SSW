@@ -36,7 +36,7 @@ if (user != null) {
 
 var userId = "example";
 // Get a reference to the database
-var database = firebase.database()
+var database = firebase.database();
 // Here, 'userId' would be the at the root of the data pushed to Firebase
 // with two child nodes 'firstName' and 'lastName' having value of
 // 'Test' and 'QualityAssurance', respectively.
