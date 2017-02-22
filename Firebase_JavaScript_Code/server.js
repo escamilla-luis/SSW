@@ -42,7 +42,7 @@ var speaker2 = messenger.createSpeaker(8002);
 var speaker3 = messenger.createSpeaker(8003);
 var speaker4 = messenger.createSpeaker(8004);
 
-var podSchedule = [-1, -1, -1, -1];
+var podSchedule = ['free', 'free', 'free', 'free'];
 
 // This callback gets executed when the client sends the server a reply 
 // letting it know that it's task is completed
@@ -87,6 +87,10 @@ var database = firebase.database();
 
 // Function that sets listener on each user (individually)
 function listenForTickets() {
+
+
+	// TEST for demo - removelater
+	var count = 1;	
 	
 	var usersRef = database.ref('users');
 	usersRef.once('value')
@@ -106,13 +110,10 @@ function listenForTickets() {
 						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
 						mutableTicketRef.child('isNewTicket').set(false);
 						
-						// TEST - Send request to client 1 if it's not busy
-						if (!isClientBusy) {
-							assignTicketToClient(userId, 1);
-						}
+						// TEST CODE - remove later
+						assignTicketToClient(userId, count++);
 					
 						// Do something relevant with userId...
-
 						var mutableEtaRef = mutableTicketRef.child('eta');
 						var mutableStatusRef = mutableTicketRef.child('status');
 					}
