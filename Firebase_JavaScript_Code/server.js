@@ -89,7 +89,9 @@ var database = firebase.database();
 function listenForTickets() {
 
 
-	var count = 2;	
+	// TEST for demo - removelater
+	var count = 1;	
+	
 	var usersRef = database.ref('users');
 	usersRef.once('value')
 		.then(function(users) {
@@ -108,7 +110,7 @@ function listenForTickets() {
 						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
 						mutableTicketRef.child('isNewTicket').set(false);
 						
-						// TEST CODE
+						// TEST CODE - remove later
 						assignTicketToClient(userId, count++);
 					
 						// Do something relevant with userId...

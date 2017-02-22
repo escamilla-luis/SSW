@@ -22,27 +22,24 @@ client.on('assignTicket', function(message, data) {
 	var firebaseUserId = data.firebaseUserId;
 	console.log("userId passed from server: " + firebaseUserId);
 	
-	
-	// Reply to server letting it know that task is complete
-	console.log("Work done! Replying to server w/ updated status");
-	message.reply({podNumber: POD_NUM, podStatus: -1});
-});
+	var onValueChange = database.ref('users').child(firebaseUserId).on('value', function(snapshot) {
+		
+		var mutableTicketRef = database.ref("users").child(snapshot.key).child("currentTicket");
+		var mutableEtaRef = mutableTicketRef.child("eta");   
+		var mutableStatusRef = mutableTicketRef.child("status");
 
-var userId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
-database.ref('users').child(userId)
-	.once('value').then(function(snapshot) {
-		// Read statusCode from snapshot
 		var statusCode = snapshot.child("currentTicket").child("status").val();
 		if (statusCode === 100 || statusCode === 300) {
 			// If timer is already on, forget it
 
 			var timerOn = snapshot.child("currentTicket").child("timerOn").val();
 			console.log("timerOn = " + timerOn);
-			if (timerOn === "true") {
+			if (timerOn == true) {
 				console.log("timer is already on");
 			} else {
-				mutableTicketRef.child("timerOn").set("true");
-				var etaValue = 15;
+				console.log('timer == false');
+				mutableTicketRef.child("timerOn").set(true);
+				var etaValue = 5;
 				var timer = setInterval(function() {
 					console.log("starting timer");
 					// Set eta from mutable ref
@@ -55,7 +52,13 @@ database.ref('users').child(userId)
 						} else {
 							mutableStatusRef.set(400);
 						}
-						mutableTicketRef.child("timerOn").set("false");
+						mutableTicketRef.child("timerOn").set(false);
+						
+						// Reply to server letting it know that task is complete
+						// TODO: Uncomment and fix later
+	//                    console.log("Work done! Replying to server w/ updated status");
+	//                    message.reply({podNumber: POD_NUM, podStatus: "free"});
+						
 						return;
 					}
 					console.log("setting eta value");
@@ -64,12 +67,14 @@ database.ref('users').child(userId)
 				}, 1000);
 			}
 		}
-
+		
+		// 
+		if (statusCode == 900) {
+			console.log('statusCode = 900');
+			database.ref('users').child(firebaseUserId).off('value', onValueChange);
+		}
 	});
-//// Begin countdown and reflect updates to user via Firebase
-//// mutable ref for setting data
-//// snapshot for reading data
-//var mutableTicketRef = database.ref("users").child(snapshot.key).child("currentTicket");
-//var mutableEtaRef = mutableTicketRef.child("eta");   
-//var mutableStatusRef = mutableTicketRef.child("status");
+
+
+});
 
