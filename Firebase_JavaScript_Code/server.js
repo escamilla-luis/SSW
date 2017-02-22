@@ -82,21 +82,6 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 	}	
 }
 
-// Demo code that will send each client 'userId' every 2 seconds.
-//var userId = 1234;
-//var podNumber = 1;
-//setInterval(function() {
-//	assignTicketToClient(userId, podNumber);
-//	
-//	userId = userId + 1;	
-//	podNumber = podNumber + 1;
-//	if (podNumber > 4) {
-//		podNumber = 1;
-//	}
-//}, 2000);
-
-
-var isClientBusy = false;
 // Firebase stuff
 var database = firebase.database();
 
@@ -130,8 +115,7 @@ function listenForTickets() {
 
 						var mutableEtaRef = mutableTicketRef.child('eta');
 						var mutableStatusRef = mutableTicketRef.child('status');
-					} 
-					
+					}
 				});
 			});
 		});
