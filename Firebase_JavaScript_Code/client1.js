@@ -1,6 +1,6 @@
-//Messenger package required for communication. 
 var messenger = require('messenger');
 var firebase = require('firebase');
+var mysql = require('mysql');
 
 // Initialize Firebase with our Spartan Superway database information
 var config = {
@@ -9,81 +9,67 @@ var config = {
 	databaseURL: "https://spartan-superway.firebaseio.com",
 	storageBucket: "spartan-superway.appspot.com",
 };
+
 firebase.initializeApp(config);
 
-// Sign into account
-var email = "Stephen.apiazza@gmail.com";
-var password = "password";
-firebase.auth().signInWithEmailAndPassword(email, password).catch(function(error) {
-	// Handle Errors here.
-	var errorCode = error.code;
-	var errorMessage = error.message;
-	console.log("Error code " + errorCode);
-	console.log("Error message " + errorMessage);
-});
+var PORT = 8001;
+var POD_NUM = 1;
+var client = messenger.createListener(PORT);
 
-// Get currently logged in user from signed in account
-var user = firebase.auth().currentUser;
-// If we want to access the user's profile information, we do so here.
-if (user != null) {
-	console.log('user != null');
-	user.providerData.forEach(function (profile) {
-		console.log("Sign-in provider: "+profile.providerId);
-		console.log("  Provider-specific UID: "+profile.uid);
-		console.log("  Name: "+profile.displayName);
-		console.log("  Email: "+profile.email);
-		console.log("  Photo URL: "+profile.photoURL);
-	});
-}
+var database = firebase.database();
+client.on('assignTicket', function(message, data) {
+	
+	var firebaseUserId = data.firebaseUserId;
+	console.log("userId passed from server: " + firebaseUserId);
+	
+	
+	// Reply to server letting it know that task is complete
+	console.log("Work done! Replying to server w/ updated status");
+	message.reply({podNumber: POD_NUM, podStatus: -1});
+});
 
 var userId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
-// Get a reference to the database
-var database = firebase.database()
-// Here, 'userId' would be the at the root of the data pushed to Firebase
-// with two child nodes 'firstName' and 'lastName' having value of
-// 'Test' and 'QualityAssurance', respectively.
-database.ref(userId).set({
-	firstName: "Test",
-	lastName: "QualityAssurance"
-});
-// Another example. We set 12345 as the name of the root node which contains 
-// two child nodes, 'test' and 'randomNumbers', with values of 'testtesttesttest'
-// and '1295500129385123010238', respectively.
-database.ref('12345').set({
-	test: "testtesttesttest",
-	randomNumbers: "1295500129385123010238"
-});
+database.ref('users').child(userId)
+	.once('value').then(function(snapshot) {
+		// Read statusCode from snapshot
+		var statusCode = snapshot.child("currentTicket").child("status").val();
+		if (statusCode === 100 || statusCode === 300) {
+			// If timer is already on, forget it
 
-var client = messenger.createSpeaker(8001);
-var pod_num = 1
-var isBusy = false;
-
-setInterval(function() {
-
-	if (!isBusy) {
-		console.log("requesting...");		
-		client.request('assignTicket', {pod_num: pod_num}, function(firebaseUserId) {
-			console.log()
-			isBusy = true;
-			var time = 10;
-			
-			var updatePodInterval = setInterval(function () {
-				
-				if (time >= 0) {
-					
-					console.log(time);
-					time = time - 1;
-				} else {
-					console.log("requesting server to update pod status");
-					client.request('updatePodSchedule', {pod_num: pod_num, isBusy: false}, function(message) {
-						if (message) {
-							console.log(message);
-							isBusy = false;
+			var timerOn = snapshot.child("currentTicket").child("timerOn").val();
+			console.log("timerOn = " + timerOn);
+			if (timerOn === "true") {
+				console.log("timer is already on");
+			} else {
+				mutableTicketRef.child("timerOn").set("true");
+				var etaValue = 15;
+				var timer = setInterval(function() {
+					console.log("starting timer");
+					// Set eta from mutable ref
+					if (etaValue == 0) {
+						
+						clearInterval(timer);
+						if (statusCode == 100) {
+							// Set status from mutable ref
+							mutableStatusRef.set(200);
+						} else {
+							mutableStatusRef.set(400);
 						}
-					});
-					clearInterval(updatePodInterval);
-				}
-			}, 1000);
-		});
-	}
-}, 2000);
+						mutableTicketRef.child("timerOn").set("false");
+						return;
+					}
+					console.log("setting eta value");
+					mutableEtaRef.set(etaValue);
+					etaValue = etaValue - 1;
+				}, 1000);
+			}
+		}
+
+	});
+//// Begin countdown and reflect updates to user via Firebase
+//// mutable ref for setting data
+//// snapshot for reading data
+//var mutableTicketRef = database.ref("users").child(snapshot.key).child("currentTicket");
+//var mutableEtaRef = mutableTicketRef.child("eta");   
+//var mutableStatusRef = mutableTicketRef.child("status");
+
