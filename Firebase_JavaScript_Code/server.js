@@ -1,6 +1,7 @@
 var messenger = require('messenger');
 var mysql = require('mysql');
 var firebase = require('firebase');
+var mysqlEvents = require('mysql-events');
 
 // Initialize Firebase with our Spartan Superway database information
 var config = {
@@ -11,95 +12,153 @@ var config = {
 };
 firebase.initializeApp(config);
 
-//Setup mySQL connection info
-var con = mysql.createConnection({
-	host:'localhost',
-	user:'timmahwork',
-	password:'',
-	database:'SSW'
-});
-
-var currentUsers = getCurrentTickets();
-//console.log(currentTickets);
-
-//Connect to database
-con.connect(function(err){
-	if(err) throw error;
-	console.log('Connection established...')
-})
- 
-//Create server listening on port 8000
-server1 = messenger.createListener(8000);
-
-//Create server listening on port 8001
-server2 = messenger.createListener(8001);
- 
-//Set up action to be taking on 'give it to me' request from client
-server1.on('give it to me', function(message, data){
-	console.log('message recieved');
-	message.reply({'you':'got it'});
-});
-
-//Set action to be taken on 'info' request
-//data is data sent from client 
-server2.on('info', function(message, data){
-	var pod = data.pod;
-	console.log('Request from '+pod+' recieved...')
-	con.query('SELECT location FROM SpartanSuperway.location WHERE pod='+ pod +';', function(err, rows) {
-		if (err) {
-			console.log(err);
-		} else {
-			//returns information to the client
-			message.reply(rows);
-		}
-	});
-});
-
-//Set action to be taken on 'setLocation'
-server2.on('setLocation', function(message, data) {
-	var pod = data.pod
-	var location = data.location
-	//Update locationin MySQL
-	con.query('UPDATE location SET location ='+ data.location +' WHERE pod='+ data.pod);
-	message.reply(location);
-});
- 
-//Set action to be taken for 'assignRier;
-server2.on('assignRider', function(message, data) {
-	var pod = data.pod
- 	console.log(data.rider)
-	//Update rider in mySQL for given pod
-	con.query('UPDATE podAssignment SET rider = \'' + data.rider + '\' WHERE pod = ' + data.pod);
-	//Return success to client
-	message.reply('Success');
-});
-//setInterval(function(){
-//	client.request('give it to me', {hello:'world'}, function(data){
-//		console.log(data);
-//	});
-//}, 1000);
+// MySQL database stuff
+//var con = mysql.createConnection({
+//	host:'localhost',
+//	user:'root',
+//	password:'password',
+//	database:'SSW'
+//})
+//
+//var dsn = {
+//	host:     'localhost',
+//	user:     'root',
+//	password: 'password'
+//};
+//
+//con.connect(function(err){
+//	if(err) {
+//		console.log('Error connecting to Database')
+//		return;
+//	}
+//	console.log('Connection established...')
+//})
 
 
+// Server/Client code
 
-var currentTicketRef = firebase.database().ref('users/Qvn71YOfXzMdmASoievQBboMEvI3/currentTicket');
+var speaker1 = messenger.createSpeaker(8001);
+var speaker2 = messenger.createSpeaker(8002);
+var speaker3 = messenger.createSpeaker(8003);
+var speaker4 = messenger.createSpeaker(8004);
 
-currentTicketRef.on('value', function(snapshot) {
-	var from = snapshot.val().from;
-	var to = snapshot.val().to;
-	console.log(from + "  " + to);
-	setDestination(1,from,to);
-	//con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=1');
-});
+var podSchedule = [-1, -1, -1, -1];
+var overflowSchedule = [];
 
-//set destination for a pod
-function setDestination(podnum,from,to) {
-	con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=' +podnum);
+// This callback gets executed when the client sends the server a reply 
+// letting it know that it's task is completed
+var clientCallback = function (data) {
+	
+	console.log("Client replied!")
+	console.log("podNumber: " + data.podNumber);
+	console.log("podStatus: " + data.podStatus);
+	
+	// Update pod schedule
+	podSchedule[data.podNumber] = data.podStatus;
+};
+
+// We can call this function here when there is a new ticket to deal
+// with from Firebase. The eventListener on Firebase will provide us
+// the userId. From there we can provide this function the available client #
+function assignTicketToClient(firebaseUserId, clientNumber) {
+	
+	var data = {firebaseUserId: firebaseUserId}
+	
+	switch (clientNumber) {
+		case 1:
+			console.log("speaker1.request()");
+			speaker1.request('assignTicket', data, clientCallback);
+			break;
+		case 2:
+			speaker2.request('assignTicket', data, clientCallback);
+			break;
+		case 3:
+			speaker3.request('assignTicket', data, clientCallback);
+			break;
+		case 4:
+			speaker4.request('assignTicket', data, clientCallback);
+			break;
+		default:
+			console.log('Error: Invalid client number specified');
+	}	
 }
 
+// Demo code that will send each client 'userId' every 2 seconds.
+var userId = 1234;
+var podNumber = 1;
+setInterval(function() {
+	assignTicketToClient(userId, podNumber);
+	
+	userId = userId + 1;	
+	podNumber = podNumber + 1;
+	if (podNumber > 4) {
+		podNumber = 1;
+	}
+}, 2000);
 
-//get an array of current tickets
+//a function thats takes a userID and their current ticket and associates them with an available pod
+//function 
+
+
+//a function that checks for an available pod
+function checkForAvailablePod() {
+	for (var i = podSchedule.length - 1; i >= 0; i--) {
+		if (podSchedule[i] < 0) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	};
+}
+
+//a function that fill users based on available pod status
+function fillIfAvailable(userID) {
+	
+	//check if its available
+	if (checkForAvailablePod) {
+
+		//check overflow for users waiting for a ride
+		if (overflowSchedule.length != 0) {
+			addUserToPodSchedule[overflowSchedule[0]];
+			overflowSchedule.splice(0, 1);
+		}
+
+		//insert new user from the server
+		else {
+			addUserToPodSchedule(userID);
+		}
+	}
+
+	//add a user to the overflow if the main queue is full
+	else {
+		overflowSchedule.push(userID);
+	}
+}
+
+//a function that adds a user to the schedule
+function addUserToPodSchedule(userID){
+	for (var i = podSchedule.length - 1; i >= 0; i--) {
+		if(podSchedule[i] < 0) {
+			podSchedule[i] = userID;
+			break
+		}
+	};
+}
+
+//remove a user from the pod schedule when done
+function removeUserFromPodSchedule(userID){
+	for (var i = podSchedule.length - 1; i >= 0; i--) {
+		if (podSchedule[i] == userID) {
+			podSchedule[i] = -1;
+			break;
+		}
+	};
+}
+
+// Gets an array of current tickets from Firebase
 function getCurrentTickets() {
-	var Users = [];
+	var users = [];
 	var tickets = [];
 	
 	usersStart = firebase.database().ref('users');
@@ -109,43 +168,23 @@ function getCurrentTickets() {
 
 		for (var i = Object.keys(snapshot.val()).length - 1; i >= 0; i--) {
 			
-			Users.push(Object.keys(snapshot.val())[i]);
+			users.push(Object.keys(snapshot.val())[i]);
 			//console.log(Object.keys(snapshot.val())[i]);
 			
 		};
 
 		//then get the array of tickets
-		for (var i = Users.length - 1; i >= 0; i--) {
-			var ticketStart = firebase.database().ref('users/'+Users[i]+'/currentTicket');
+		for (var i = users.length - 1; i >= 0; i--) {
+			var ticketStart = firebase.database().ref('users/' + users[i]+'/currentTicket');
 
 			ticketStart.on('value', function(snapshot) {
 				//console.log(snapshot.val());
 				tickets.push(snapshot.val());
-			})
+			});
 		};
 
 		console.log(tickets);
-
 		return tickets;
-
-	})
-	
+	});
 }
-
-//get an array of tickets and their from/to values
-// function getCurrentTickets() {
-// 	var Users = [];
-// 	console.log('see me');
-// 	while(typeof Users === null){
-// 		console.log(Users);
-// 		Users = getCurrentUsers();
-// 	};
-
-// 	for (var i = Users.length - 1; i >= 0; i--) {
-// 		var currentTicket = firebase.database().ref('users/'+ Users[i] + '/currentTicket');
-// 		console.log(currentTicket);
-// 	};
-// }
-
-//con.end();
 
