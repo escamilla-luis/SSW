@@ -122,6 +122,7 @@ function fillIfAvailable(userID) {
 		if (overflowSchedule.length != 0) {
 			addUserToPodSchedule[overflowSchedule[0]];
 			overflowSchedule.splice(0, 1);
+			overflowSchedule.push(userID);
 		}
 
 		//insert new user from the server
@@ -141,7 +142,7 @@ function addUserToPodSchedule(userID){
 	for (var i = podSchedule.length - 1; i >= 0; i--) {
 		if(podSchedule[i] < 0) {
 			podSchedule[i] = userID;
-			break
+			break;
 		}
 	};
 }
