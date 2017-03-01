@@ -1,3 +1,4 @@
+var utils = require('./utils.js');
 var messenger = require('messenger');
 var mysql = require('mysql');
 var firebase = require('firebase');
@@ -43,6 +44,7 @@ var speaker3 = messenger.createSpeaker(8003);
 var speaker4 = messenger.createSpeaker(8004);
 
 var podSchedule = ['free', 'free', 'free', 'free'];
+var overflowSchedule = [];
 
 // This callback gets executed when the client sends the server a reply 
 // letting it know that it's task is completed
@@ -111,7 +113,11 @@ function listenForTickets() {
 						mutableTicketRef.child('isNewTicket').set(false);
 						
 						// TEST CODE - remove later
+						console.log('count: ' + count);
 						assignTicketToClient(userId, count++);
+						if (count > 3) {
+							count = 1;
+						}
 					
 						// Do something relevant with userId...
 						var mutableEtaRef = mutableTicketRef.child('eta');
@@ -124,3 +130,66 @@ function listenForTickets() {
 
 listenForTickets();
 
+//a function that checks for an available pod
+function checkForAvailablePod() {
+
+	var thecheck = false;
+
+	for (var i = 0; i < podSchedule.length; i++) {
+		if (podSchedule[i] == 'free') {
+			thecheck = true;
+			break;
+		}
+	};
+
+	return thecheck;
+
+}
+
+
+//a function that fill users based on available pod status
+function fillIfAvailable(userID) {
+	
+	//check if its available
+	if (checkForAvailablePod()) {
+
+		//check overflow for users waiting for a ride
+		if (overflowSchedule.length != 0) {
+			console.log('adding from overflow')
+			addUserToPodSchedule(overflowSchedule[0]);
+			overflowSchedule.splice(0, 1);
+		}
+
+		//insert new user from the server
+		else {
+			addUserToPodSchedule(userID);
+		}
+	}
+
+	//add a user to the overflow if the main queue is full
+	else {
+		overflowSchedule.push(userID);
+	}
+}
+
+//a function that adds a user to the schedule
+function addUserToPodSchedule(userID){
+	for (var i = 0; i < podSchedule.length; i++) {
+		if(podSchedule[i] == 'free') {
+			podSchedule[i] = userID;
+			i = 5;
+		}
+	};
+}
+
+//remove a user from the pod schedule when done
+function removeUserFromPodSchedule(userID){
+	for (var i = 0; i < podSchedule.length; i++) {
+		if (podSchedule[i] == userID) {
+			podSchedule[i] = 'free';
+			i = 5;
+		}
+	};
+}
+
+utils.getCurrentTickets;

@@ -39,7 +39,7 @@ client.on('assignTicket', function(message, data) {
 			} else {
 				console.log('timer == false');
 				mutableTicketRef.child("timerOn").set(true);
-				var etaValue = 5;
+				var etaValue = 10;
 				var timer = setInterval(function() {
 					console.log("starting timer");
 					// Set eta from mutable ref
@@ -56,8 +56,8 @@ client.on('assignTicket', function(message, data) {
 						
 						// Reply to server letting it know that task is complete
 						// TODO: Uncomment and fix later
-	//                    console.log("Work done! Replying to server w/ updated status");
-	//                    message.reply({podNumber: POD_NUM, podStatus: "free"});
+//	                    console.log("Work done! Replying to server w/ updated status");
+//	                    message.reply({podNumber: POD_NUM, podStatus: "free"});
 						
 						return;
 					}

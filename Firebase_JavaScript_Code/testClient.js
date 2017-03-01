@@ -1,6 +1,4 @@
-var messenger = require('messenger');
 var firebase = require('firebase');
-var mysql = require('mysql');
 
 // Initialize Firebase with our Spartan Superway database information
 var config = {
@@ -12,17 +10,11 @@ var config = {
 
 firebase.initializeApp(config);
 
-var PORT = 8004;
-var POD_NUM = 4;
-var client = messenger.createListener(PORT);
-
 var database = firebase.database();
-client.on('assignTicket', function(message, data) {
+var firebaseUserId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
+console.log("userId passed from server: " + firebaseUserId);
     
-    var firebaseUserId = data.firebaseUserId;
-    console.log("userId passed from server: " + firebaseUserId);
-    
-    var onValueChange = database.ref('users').child(firebaseUserId).on('value', function(snapshot) {
+var onValueChange = database.ref('users').child(firebaseUserId).on('value', function(snapshot) {
         
         var mutableTicketRef = database.ref("users").child(snapshot.key).child("currentTicket");
         var mutableEtaRef = mutableTicketRef.child("eta");   
@@ -56,8 +48,8 @@ client.on('assignTicket', function(message, data) {
                         
                         // Reply to server letting it know that task is complete
                         // TODO: Uncomment and fix later
-    //                    console.log("Work done! Replying to server w/ updated status");
-    //                    message.reply({podNumber: POD_NUM, podStatus: "free"});
+//	                    console.log("Work done! Replying to server w/ updated status");
+//	                    message.reply({podNumber: POD_NUM, podStatus: "free"});
                         
                         return;
                     }
@@ -74,7 +66,3 @@ client.on('assignTicket', function(message, data) {
             database.ref('users').child(firebaseUserId).off('value', onValueChange);
         }
     });
-
-
-});
-
