@@ -12,115 +12,64 @@ var config = {
 };
 firebase.initializeApp(config);
 
-// MySQL database stuff
-//var con = mysql.createConnection({
-//	host:'localhost',
-//	user:'root',
-//	password:'password',
-//	database:'SSW'
-//})
-//
-//var dsn = {
-//	host:     'localhost',
-//	user:     'root',
-//	password: 'password'
-//};
-//
-//con.connect(function(err){
-//	if(err) {
-//		console.log('Error connecting to Database')
-//		return;
-//	}
-//	console.log('Connection established...')
-//})
+//Setup mySQL connection info
+var con = mysql.createConnection({
+	host:'localhost',
+	user:'root',
+	password:'password',
+	database:'SSW'
+})
 
-
-// Server/Client code
-
-var speaker1 = messenger.createSpeaker(8001);
-var speaker2 = messenger.createSpeaker(8002);
-var speaker3 = messenger.createSpeaker(8003);
-var speaker4 = messenger.createSpeaker(8004);
-
-var podSchedule = ['free', 'free', 'free', 'free'];
-
-// This callback gets executed when the client sends the server a reply 
-// letting it know that it's task is completed
-var clientCallback = function (data) {
-	
-	console.log("Client replied!")
-	console.log("podNumber: " + data.podNumber);
-	console.log("podStatus: " + data.podStatus);
-	
-	// Update pod schedule
-	podSchedule[data.podNumber] = data.podStatus;
+var dsn = {
+	host:     'localhost',
+	user:     'root',
+	password: 'password'
 };
 
-// We can call this function here when there is a new ticket to deal
-// with from Firebase. The eventListener on Firebase will provide us
-// the userId. From there we can provide this function the available client #
-function assignTicketToClient(firebaseUserId, clientNumber) {
-	
-	var data = {firebaseUserId: firebaseUserId}
-	
-	switch (clientNumber) {
-		case 1:
-			console.log("speaker1.request()");
-			speaker1.request('assignTicket', data, clientCallback);
-			break;
-		case 2:
-			speaker2.request('assignTicket', data, clientCallback);
-			break;
-		case 3:
-			speaker3.request('assignTicket', data, clientCallback);
-			break;
-		case 4:
-			speaker4.request('assignTicket', data, clientCallback);
-			break;
-		default:
-			console.log('Error: Invalid client number specified');
-	}	
-}
+//Connect to database
+con.connect(function(err){
+	if(err) {
+		console.log('Error connecting to Database')
+		return;
+	}
+	console.log('Connection established...')
+})
 
-// Firebase stuff
-var database = firebase.database();
+//Indexed array to hold ticket ID for pod based on pod_num 
+var podSchedule  = [1234,-1,-1,-1, -1, -1];
+console.log(podSchedule);
+//Create server listening on port 8001
+server1 = messenger.createListener(8001);
 
-// Function that sets listener on each user (individually)
-function listenForTickets() {
+server1.on("assignTicket" , function(message, data) {
+	var pod_num = data.pod_num - 1;
+		console.log(pod_num);
+	if (podSchedule[pod_num] != -1) {
+		message.reply(podSchedule[pod_num]);
+	}
+	var podText = "";
+	for (var i = 0; i < podSchedule.length; i++) {
+	 podText += podSchedule[i] + ",";
+	}
+	console.log(podSchedule);
+});
+
+server1.on("updatePodSchedule", function(message, data){
+	var pod_num = data.pod_num - 1;
+	var busy = data.busy;
+	if (!busy) {
+		podSchedule[pod_num] = -1;
+		message.reply("Updated to Inactive");
+	}
+});
 
 
-	// TEST for demo - removelater
-	var count = 1;	
-	
-	var usersRef = database.ref('users');
-	usersRef.once('value')
-		.then(function(users) {
-			users.forEach(function(user) {
-				usersRef.child(user.key).on('value', function(snapshot) {
-					
-					// Only perform something relevant on ticket if 'isTicketAlive' == true
-					var userId = snapshot.key;
-					console.log('userId: ' + userId);
+var currentTicketRef = firebase.database().ref('users/Qvn71YOfXzMdmASoievQBboMEvI3/currentTicket');
 
-					var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
-					if (isNewTicket == true) {
-						console.log('Ticket is new!');
-						
-						// Handle ticket here
-						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
-						mutableTicketRef.child('isNewTicket').set(false);
-						
-						// TEST CODE - remove later
-						assignTicketToClient(userId, count++);
-					
-						// Do something relevant with userId...
-						var mutableEtaRef = mutableTicketRef.child('eta');
-						var mutableStatusRef = mutableTicketRef.child('status');
-					}
-				});
-			});
-		});
-}
-
-listenForTickets();
+currentTicketRef.on('value', function(snapshot) {
+	var from = snapshot.val().from;
+	var to = snapshot.val().to;
+	console.log(from + "  " + to);
+	con.query('UPDATE pods SET station_from='+from+', station_to=' +to+ ' WHERE pod_num=1');
+});
 

@@ -1,12 +1,8 @@
 // Libraries for the RFID and for the motors
-#include <RFID.h>
+#include <AddicoreRFID.h>
 #include <SPI.h>
 #include <TimerThree.h>
 
-
-/* Note: For Xbee Pro, Channel CH = C, Pan ID = 2017
- *  
- */
 
 
 // Pin definitions
@@ -14,15 +10,11 @@
 /* Note: For RFID reader - SDA (PIN 9), SCK (PIN 52), MOSI (PIN 51),
  *  MISO (PIN 50), RST (PIN 8).
  */
-#define motor1          2   // Interrupt 0
-#define motor2          3   // Interrupt 1
+#define motor1          2
+#define motor2          3
 #define RED             10  // STOP and Error status
 #define GREEN           11  // GO status
 #define BLUE            12  // Status of the podcar
-#define motor1_enco_a   18  // Interrupt 5
-#define motor1_enco_b   19  // Interrupt 4
-#define motor2_enco_a   20  // Interrupt 3 
-#define motor2_enco_b   21  // Interrupt 2
 #define ECHO            22  // Echo pin
 #define TRIG            23  // Trig pin
 #define KILL_SWITCH     24  // Kill switch
@@ -65,16 +57,6 @@ int maximumRange = 200;       // Maximum range needed
 int minimumRange = 0;         // Minimum range needed
 long duration;                // Duration used to calculate distance
 int distance;                 // Stores the distance
-
-
-// Used for motor encoders
-// Encoders provide 12 counts per revolution of the motor shaft when 
-// counting both edges of both channels
-// To compute the counts/rev of gearbox output shaft, multiply gear ratio by 12
-volatile unsigned int enc_count_1 = 0;
-volatile unsigned int enc_count_2 = 0;
-float vel1, vel2;
-
 
 
 // Variables used to store the readings from the hall effect sensors
@@ -120,24 +102,11 @@ void setup()
   
 
   // Inputs
-  pinMode(motor1_enco_a, INPUT);
-  pinMode(motor1_enco_b, INPUT);
-  pinMode(motor2_enco_a, INPUT);
-  pinMode(motor2_enco_b, INPUT);
   pinMode(ECHO, INPUT);
   pinMode(KILL_SWITCH, INPUT_PULLUP);
   pinMode(RESET, INPUT_PULLUP);
   pinMode(HALL_SENSOR1, INPUT);
   pinMode(HALL_SENSOR2, INPUT);
-
-
-  digitalWrite(motor1_enco_a, HIGH);       // Turn on pull-up resistors
-  digitalWrite(motor1_enco_b, HIGH);       
-  digitalWrite(motor2_enco_a, HIGH);     
-  digitalWrite(motor2_enco_b, HIGH);     
-
-
-  // Encoder pins
 
 
   // Set TimerThree to signal at 20Hz frequency (20 times/sec)
@@ -159,9 +128,6 @@ void setup()
 
   /* Initialize the RFID reader */
   RC522.init();
-
-
-  // Set initial encoder count variable
 }
 
 
@@ -192,8 +158,6 @@ void loop()
 
   // System controls
   controls();
-
-  getSpeedOfMotors();
 }
 
 
@@ -208,7 +172,8 @@ int getStationNumber()
     RC522.readCardSerial();
 
 
-    /* Get the Serial number of the tag */
+    /* Display the Serial number of the tag */
+    Serial.println("Podcar is at station:");
 
 
     for (int i = 0; i < 1; i++)
@@ -239,6 +204,9 @@ int getStationNumber()
       StationId = 4;
       return StationId;
     }
+
+    Serial.print(StationId);
+    Serial.println();
   }
   delay(50);
 }
@@ -271,15 +239,6 @@ void magnetRead()
 
   // Checks if any magnet is read on the right of podcar
   hall_2_state = digitalRead(HALL_SENSOR2);
-
-  Serial.print("Left Hall Effect Sensor Reading: ");
-  Serial.print(hall_1_state);
-  Serial.println();
-  Serial.println();
-  Serial.print("Right Hall Effect Sensor Reading: ");
-  Serial.print(hall_2_state);
-  Serial.println();
-  Serial.println();
 }
 
 
@@ -304,11 +263,6 @@ void ultrasonic()
 
    // Calculate the distance (in cm) based on the speed of sound
    distance = duration/58.2;
-
-   Serial.print("Anti-collision distance: ");
-   Serial.print(distance);
-   Serial.println();
-   Serial.println();
 }
 
 
@@ -467,7 +421,7 @@ void controls()
    else if (hall_1_state == 0 || hall_2_state == 0)
    {
     setStateLED(2);
-    setSpeedOfMotors(580);
+    setSpeedOfMotors(800);
    } 
 
    // Checks to see if podcar is at a station
@@ -475,24 +429,22 @@ void controls()
    {
     setStateLED(1); 
     setSpeedOfMotors(0);
-    Serial.print("Podcar is at station: ");
-    Serial.print(StationId);
-    Serial.println();
-    Serial.println();
    }
 
    // LED should be green
    else
    {
     setStateLED(3);
-    setSpeedOfMotors(580);
+    setSpeedOfMotors(800);
    }
+   
+   // delay 50 ms before next reading
+   delay(50);  
 }
 
 
 
 // Function that sets the speed of the motors
-// A pwm signal of 580 corresponds to a speed of ~0.82 ft/s (~0.25 m/s)
 void setSpeedOfMotors(double motor_speed)
 {
   Timer3.pwm(motor1, motor_speed);
@@ -504,6 +456,7 @@ void setSpeedOfMotors(double motor_speed)
 // Retrieves the speed of the motor based on the encoders
 double getSpeedOfMotors()
 {
+  
 }
 
 
