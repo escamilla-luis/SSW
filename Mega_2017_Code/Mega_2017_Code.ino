@@ -1,5 +1,5 @@
 // Libraries for the RFID and for the motors
-#include <RFID.h>
+#include <AddicoreRFID.h>
 #include <SPI.h>
 #include <TimerThree.h>
 
