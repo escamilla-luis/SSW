@@ -13,5 +13,5 @@ var thread = spawn('thethread.js');
 thread
 	.send({ do : 'Something'})
 	.on('message', function(message) {
-		console.log('thethread.js replied: ', message);
+		console.log(message + 'this is when it ends');
 	});
