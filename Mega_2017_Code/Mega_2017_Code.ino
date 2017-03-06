@@ -1,8 +1,9 @@
+#include <RFID.h>
+
 // Libraries for the RFID and for the motors
-#include <AddicoreRFID.h>
+//#include <AddicoreRFID.h>
 #include <SPI.h>
 #include <TimerThree.h>
-
 
 
 // Pin definitions
@@ -175,38 +176,35 @@ int getStationNumber()
     /* Display the Serial number of the tag */
     Serial.println("Podcar is at station:");
 
-
     for (int i = 0; i < 1; i++)
     {
       SSN = RC522.serNum[i];
     }
 
-    if (SSN == 35)
+    if (SSN == 85)
     {
       StationId = 1;
-      return StationId;
     }
 
-    if (SSN == 110)
+    if (SSN == 101)
     {
       StationId = 2;
-      return StationId;
     }
 
-    if (SSN == 103)
+    if (SSN == 149)
     {
       StationId = 3;
-      return StationId;
     }
 
-    if (SSN == 132)
+    if (SSN == 21)
     {
       StationId = 4;
-      return StationId;
     }
 
     Serial.print(StationId);
     Serial.println();
+    
+    return StationId;
   }
   delay(50);
 }
@@ -431,7 +429,7 @@ void controls()
     setSpeedOfMotors(0);
    }
 
-   // LED should be green
+   // LED should be green 
    else
    {
     setStateLED(3);
@@ -466,3 +464,4 @@ void sendXbee()
 {
   
 }
+
