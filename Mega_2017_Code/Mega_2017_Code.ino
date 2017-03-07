@@ -4,6 +4,7 @@
 //#include <AddicoreRFID.h>
 #include <SPI.h>
 #include <TimerThree.h>
+#include <SoftwareSerial.h>
 
 
 // Pin definitions
@@ -89,10 +90,14 @@ long SSN = 0;
 // Used to identify which podcar it is
 int vehicle_number = 1;
 
+SoftwareSerial XBee(0,1); //RX, TX
+
 
  
 void setup()
 {
+
+  
   // Outputs
   pinMode(motor1, OUTPUT);
   pinMode(motor2, OUTPUT);
@@ -115,7 +120,8 @@ void setup()
 
   
   // Change this to 57600 for Xbee Comm
-  Serial.begin(9600);
+  XBee.begin(57600);
+  Serial.begin(57600);
 
 
   // Start timer3 PWM for motors
@@ -135,6 +141,19 @@ void setup()
 
 void loop()
 { 
+  //Check for XBee
+  if(XBee.available() || Serial.available()) {
+    Serial.println("hey XBee!");
+    Serial.println();
+    Serial.println(XBee.read());
+    //Serial.write(XBee.read());
+    Serial.println(Serial.read());
+    //XBee.write(Serial.read());
+    
+    
+  }
+
+  
   // Checks on the state of the kill button
   killState();
 
@@ -427,6 +446,7 @@ void controls()
    {
     setStateLED(1); 
     setSpeedOfMotors(0);
+    StationId = 0;
    }
 
    // LED should be green 
