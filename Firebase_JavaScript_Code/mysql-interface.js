@@ -10,7 +10,45 @@ var conn = mysql.createConnection({
     database:'SSW'
 })
 
+getAllPodInfo(1);
+
 /*** --= QUERY FUNCTIONS =-- ***/
+
+function getAllPodInfo(podnum) {
+    //var 
+    conn.query('SELECT * FROM pods', function (error, results, fields) {
+
+        console.log("hey here");
+
+        if (error) throw error;
+
+        console.log(results);
+
+        for (var i in results) {
+            console.log(results[i]);
+        }
+    })
+}
+
+function getStatus(podnum) {
+
+}
+
+function getTimeLeft(podnum) {
+
+}
+
+function setTo(podnum) {
+
+}
+
+function setFrom(podnum) {
+
+}
+
+function setStatus(podnum) {
+
+}
 
 // Returns a reference to the currentTicket of a particular user
 // -userId: String of the user's id in MySQL
@@ -71,13 +109,13 @@ function setStatus(userId, statusCode) {
 // Remember, these function calls are ASYNCHRONOUS, which may affect how you write your code
 
 // Get a list of references that is returned as an argument of our callback function
-getAllCurrentTickets(function(listOfRef) {
-    // Iterate through each reference
-    listOfRef.forEach(function(ref) {
-        // Get the snapshot of the returns returned as an argument of our callback function
-        getSnapshot(ref, function(snapshot) {
-            // Log the value after retrieving the snapshot in the callback function
-            console.log('status: ' + snapshot.child('status').val());
-        });
-    });
-});
+// getAllCurrentTickets(function(listOfRef) {
+//     // Iterate through each reference
+//     listOfRef.forEach(function(ref) {
+//         // Get the snapshot of the returns returned as an argument of our callback function
+//         getSnapshot(ref, function(snapshot) {
+//             // Log the value after retrieving the snapshot in the callback function
+//             console.log('status: ' + snapshot.child('status').val());
+//         });
+//     });
+// });

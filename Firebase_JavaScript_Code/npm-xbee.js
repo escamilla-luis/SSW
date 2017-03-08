@@ -12,8 +12,8 @@ var xbeeAPI = new xbee_api.XBeeAPI({
 
 // End-Device should be master
 // Coordinator should be  
-var serial_xbee_master = new SerialPort('/dev/tty.usbserial-DN01IPR5', {
-    baudrate: 9600,
+var serial_xbee_master = new SerialPort('/dev/ttyUSB0', {
+    baudrate: 57600,
     parser: xbeeAPI.rawParser()
 });
 
@@ -32,7 +32,7 @@ serial_xbee_master.on('open', function(data) {
         commandParameter: "Hello, World! SPARTAN SUPERWAY"
     }
     
-    serial_xbee_master.write(xbeeAPI.buildFrame(data), function(err, res) {
+    serial_xbee_master.write([ 20, 2, 1, 0], function(err, res) {
         if (err) {
             console.log('err');
         } else {
@@ -55,21 +55,21 @@ var raw_frame = new Buffer([
 
 //console.log(xbeeAPI.parseFrame(raw_frame));
 
-var message = 'Num: ';
-var counter = 1;
-function write() {
+// var message = 'Num: ';
+// var counter = 1;
+// function write() {
     
-    serial_xbee_master.open(function(err) {
+//     serial_xbee_master.open(function(err) {
         
-        console.log('Writing serial data: ' + counter++);
-        serial_xbee_master.write(counter, function(err, res) {
-            if (err) {
-                console.log(err);
-            }
-            serial_xbee_master.close();
-        });
-    });
-}
+//         console.log('Writing serial data: ' + counter++);
+//         serial_xbee_master.write(counter, function(err, res) {
+//             if (err) {
+//                 console.log(err);
+//             }
+//             serial_xbee_master.close();
+//         });
+//     });
+// }
 
 //setTimeout(write, 50); // Wait 50 ms for initialization and for port to open
 //setInterval(write, 1000) // Write data every 1 second
