@@ -39,7 +39,7 @@ client.on('assignTicket', function(message, data) {
             } else {
                 console.log('timer == false');
                 mutableTicketRef.child("timerOn").set(true);
-                var etaValue = 5;
+                var etaValue = 10;
                 var timer = setInterval(function() {
                     console.log("starting timer");
                     // Set eta from mutable ref

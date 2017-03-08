@@ -1,0 +1,25 @@
+var util = require('util');
+var SerialPort = require('serialport');
+var xbee_api = require('xbee-api');
+var C = xbee_api.constants;
+
+var xbeeAPI = new xbee_api.XBeeAPI({
+    api_mode: 1,
+    module: 'Any',
+    rawr_frames: true
+});
+
+// End-Device should be master?
+// Coordinator should be worker?
+// **Test this thoroughly
+
+// Writes to an xbee
+// -path: path to serialport that xbee is connected to (ex. /dev/tty.usbserial-DN01IYP9)
+function writeToXbee(path, options, func) {
+    var serial_xbee = new SerialPort(path, {
+        baudrate: 57600,
+        parser: xbeeAPI.rawParser()
+    });
+    
+    serial_xbee.on('open', func);
+}
