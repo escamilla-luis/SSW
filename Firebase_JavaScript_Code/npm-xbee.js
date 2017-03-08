@@ -10,10 +10,11 @@ var xbeeAPI = new xbee_api.XBeeAPI({
     raw_frames: true
 });
 
+
 // End-Device should be master
-// Coordinator should be  
-var serial_xbee_master = new SerialPort('/dev/tty.usbserial-DN01IPR5', {
-    baudrate: 9600,
+// Coordinator should be worker
+var serial_xbee_master = new SerialPort('/dev/tty.usbserial-DN01IYP9', {
+    baudrate: 57600,
     parser: xbeeAPI.rawParser()
 });
 
@@ -71,5 +72,5 @@ function write() {
     });
 }
 
-//setTimeout(write, 50); // Wait 50 ms for initialization and for port to open
-//setInterval(write, 1000) // Write data every 1 second
+// setTimeout(write, 50); // Wait 50 ms for initialization and for port to open
+// setInterval(write, 1000) // Write data every 1 second
