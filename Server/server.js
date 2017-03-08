@@ -41,9 +41,8 @@ firebase.initializeApp(config);
 var speaker1 = messenger.createSpeaker(8001);
 var speaker2 = messenger.createSpeaker(8002);
 var speaker3 = messenger.createSpeaker(8003);
-var speaker4 = messenger.createSpeaker(8004);
 
-var podSchedule = ['free', 'free', 'free', 'free'];
+var podSchedule = ['free', 'free', 'free'];
 var overflowSchedule = [];
 
 // This callback gets executed when the client sends the server a reply 
@@ -75,9 +74,6 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 			break;
 		case 3:
 			speaker3.request('assignTicket', data, clientCallback);
-			break;
-		case 4:
-			speaker4.request('assignTicket', data, clientCallback);
 			break;
 		default:
 			console.log('Error: Invalid client number specified');
