@@ -88,7 +88,7 @@ function createNewJobThread(user) {
 	var thread = spawn('client.js');
 
 	//find which pod number the thread will use
-	var podnumberInUse = podSchedule.index(user) + 1;
+	var podnumberInUse = 2;//= podSchedule.index(user) + 1;
 	
 	thread
 		.send({podnumber : podnumberInUse})
