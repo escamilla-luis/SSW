@@ -1,12 +1,10 @@
-// Libraries for the RFID and for the motors
 #include <RFID.h>
+
+// Libraries for the RFID and for the motors
+//#include <AddicoreRFID.h>
 #include <SPI.h>
 #include <TimerThree.h>
-
-
-/* Note: For Xbee Pro, Channel CH = C, Pan ID = 2017
- *  
- */
+#include <SoftwareSerial.h>
 
 
 // Pin definitions
@@ -14,15 +12,11 @@
 /* Note: For RFID reader - SDA (PIN 9), SCK (PIN 52), MOSI (PIN 51),
  *  MISO (PIN 50), RST (PIN 8).
  */
-#define motor1          2   // Interrupt 0
-#define motor2          3   // Interrupt 1
+#define motor1          2
+#define motor2          3
 #define RED             10  // STOP and Error status
 #define GREEN           11  // GO status
 #define BLUE            12  // Status of the podcar
-#define motor1_enco_a   18  // Interrupt 5
-#define motor1_enco_b   19  // Interrupt 4
-#define motor2_enco_a   20  // Interrupt 3 
-#define motor2_enco_b   21  // Interrupt 2
 #define ECHO            22  // Echo pin
 #define TRIG            23  // Trig pin
 #define KILL_SWITCH     24  // Kill switch
@@ -67,16 +61,6 @@ long duration;                // Duration used to calculate distance
 int distance;                 // Stores the distance
 
 
-// Used for motor encoders
-// Encoders provide 12 counts per revolution of the motor shaft when 
-// counting both edges of both channels
-// To compute the counts/rev of gearbox output shaft, multiply gear ratio by 12
-volatile unsigned int enc_count_1 = 0;
-volatile unsigned int enc_count_2 = 0;
-float vel1, vel2;
-
-
-
 // Variables used to store the readings from the hall effect sensors
 int hall_1_state;
 int hall_2_state;
@@ -102,14 +86,22 @@ const long interval = 250;
 int  StationId = 0;
 long SSN = 0;
 
+// Create Array to be stored as message
+int message[1];
+
 
 // Used to identify which podcar it is
 int vehicle_number = 1;
 
+SoftwareSerial XBee(0,1); //RX, TX
+
+int commands[8];
 
  
 void setup()
 {
+
+  
   // Outputs
   pinMode(motor1, OUTPUT);
   pinMode(motor2, OUTPUT);
@@ -120,10 +112,6 @@ void setup()
   
 
   // Inputs
-  pinMode(motor1_enco_a, INPUT);
-  pinMode(motor1_enco_b, INPUT);
-  pinMode(motor2_enco_a, INPUT);
-  pinMode(motor2_enco_b, INPUT);
   pinMode(ECHO, INPUT);
   pinMode(KILL_SWITCH, INPUT_PULLUP);
   pinMode(RESET, INPUT_PULLUP);
@@ -131,21 +119,13 @@ void setup()
   pinMode(HALL_SENSOR2, INPUT);
 
 
-  digitalWrite(motor1_enco_a, HIGH);       // Turn on pull-up resistors
-  digitalWrite(motor1_enco_b, HIGH);       
-  digitalWrite(motor2_enco_a, HIGH);     
-  digitalWrite(motor2_enco_b, HIGH);     
-
-
-  // Encoder pins
-
-
   // Set TimerThree to signal at 20Hz frequency (20 times/sec)
   Timer3.initialize(1000000 / 1000);
 
   
   // Change this to 57600 for Xbee Comm
-  Serial.begin(9600);
+  XBee.begin(57600);
+  Serial.begin(57600);
 
 
   // Start timer3 PWM for motors
@@ -159,184 +139,181 @@ void setup()
 
   /* Initialize the RFID reader */
   RC522.init();
-
-
-  // Set initial encoder count variable
 }
 
+
+
+String readString = "";
+
+ byte checksum = 0x00;
+  bool string_enable = false;
+  String string_complete = "";
+  int result = 0;
+
+  
+/**
+  * Xbee communication will have a certain protocol in the form of an int array.
+  * The int array will signal the Arduino to perform an action. The protocol will be in the following form:
+  * [ActionId, ....(actions for each signal)]
+  * Above every function, there will be an explanation of what each array will do based on the given number input between 0-9 for each index.
+*/
 
 
 void loop()
 { 
+  //Serial.write('a');
+  //Check for XBee
+  
+
+  receiveXbeeMessage();
+
+  if (commands[0] > 0){
+    resolvePacketData();
+  }
+
+  
   // Checks on the state of the kill button
-  killState();
+  //killState();
 
 
   // Function that will check to see if any of the hall effect sensors read a magnet
-  magnetRead();
-
-
-  // Retrieves the station that the podcar is at if a tag is read
-  getStationNumber();
-
-
-  // Retrieves the distance from the ultrasonic sensor and returns the state of the collision
-  // detection system
-  ultrasonic();
-  isSomethingInFront();
-
-
-  // Retrieves the state of the RGB LED
-  getStateLED();
+  //magnetRead();
   
 
   // System controls
-  controls();
-
-  getSpeedOfMotors();
+  //controls();
 }
 
+void resolvePacketData() {
 
+  // initialization of important variables
+  int actionId = commands[0];
+  int speedOfMotors;
+
+  switch (actionId) {
+
+    // setNextStation
+    case 1: Serial.println("setstation");
+    setNextStation(commands[1]);
+    break;
+
+    // getNextStation
+    case 2: Serial.println("getstation");
+    //sendxbee(commands[1], commands[2],...);
+    break;
+
+    // SetLED
+    case 3: Serial.println("setLED");
+    setStateLED(commands[1]);
+    break;
+
+    //getLED
+    case 4: Serial.println("getLED");
+    //sendxbee(commands[1], commands[2],...);
+    break;
+
+    //setSpeed
+    case 5: Serial.println("setSpeed");
+    speedOfMotors = commands[1] * 100;
+    setSpeedOfMotors(speedOfMotors);
+    break;
+
+    //getSpeed
+    case 6: Serial.println("getSpeed");
+    //sendxbee(commands[1], commands[2],...);
+    break;
+  }
+
+  commands[0] = 0;
+  
+}
+
+void receiveXbeeMessage() {
+
+  char in;
+  int additive;
+  int counterForCommands = 0;
+
+  // Next, fill the array with the list of commands.
+  while(Serial.available()) {
+    delay(10);  //small delay to allow input buffer to fill
+
+    in = (char)Serial.read();
+    additive = (int)in - 48;
+    
+    commands[counterForCommands] = additive;
+    counterForCommands++;
+  }
+
+//  if (commands[0] > 0) {
+//    Serial.println(commands[0]);
+//    Serial.println(commands[1]);
+//    Serial.println(commands[2]);
+//    Serial.println(commands[3]);
+//    Serial.println(commands[4]);
+//    Serial.println(commands[5]);
+//    Serial.println(commands[6]);
+//    Serial.println(commands[7]);
+//    commands[0] = 0;
+//  }
+}
+
+// Function to send all requested information through Xbee??
+void sendXbee()
+{
+  
+}
+
+// Sets the next station number
+// [ActionId = 1, lengthOfArray = 3, the next station number between 1-4]
+void setNextStation(int station_number)
+{
+  Serial.println("in setStation");
+}
 
 // Retrieves the Station ID
+// [ActionID = 2, StationNumber last visited between 1-4]
 int getStationNumber()
 {
-  /* Has a card been detected? */
-  if (RC522.isCard())
-  {
+  //StationId = 0;
+  
     /* If so then get its serial number */
     RC522.readCardSerial();
+    SSN = RC522.serNum[0];
 
-
-    /* Get the Serial number of the tag */
-
-
-    for (int i = 0; i < 1; i++)
-    {
-      SSN = RC522.serNum[i];
-    }
-
-    // For square tags, SSN = 35
     if (SSN == 85)
     {
       StationId = 1;
-      return StationId;
     }
-    // SSN = 110
+
     if (SSN == 101)
     {
       StationId = 2;
-      return StationId;
     }
-    // SSN = 103
+
     if (SSN == 149)
     {
       StationId = 3;
-      return StationId;
     }
-    // SSN = 132
+
     if (SSN == 21)
     {
       StationId = 4;
-      return StationId;
     }
-  }
-//  Serial.println(SSN);
+
+    // Shows the Station Number it is at
+    Serial.println("The Station Id is:  ");
+    Serial.println(StationId);
+
+    RC522.isCard();
+    
+    return StationId;
+  
   delay(50);
 }
 
-
-
-// Sets the next station number
-void setNextStationNumber(int station_number)
-{
-  
-}
-
-
-
-// Checks the status of the button
-void killState()
-{
-  // Continuously check the status of the kill button
-  kill_state  = digitalRead(KILL_SWITCH);
-}
-
-
-
-// Retrieves the readings from the hall effect sensors
-void magnetRead()
-{
-  // Checks if any magnet is read on the left of podcar
-  hall_1_state = digitalRead(HALL_SENSOR1);
-
-
-  // Checks if any magnet is read on the right of podcar
-  hall_2_state = digitalRead(HALL_SENSOR2);
-
-  Serial.print("Left Hall Effect Sensor Reading: ");
-  Serial.print(hall_1_state);
-  Serial.println();
-  Serial.println();
-  Serial.print("Right Hall Effect Sensor Reading: ");
-  Serial.print(hall_2_state);
-  Serial.println();
-  Serial.println();
-}
-
-
-
-// Function that will return the distance from the ultrasonic sensor
-void ultrasonic()
-{
-  /* The following trigPin/echoPin cycle is used to determine the distance of 
-   *  the nearest object by bouncing soundwaves off of it 
-   */
-
-   digitalWrite(TRIG, OFF);
-   delayMicroseconds(2);
-
-   digitalWrite(TRIG, ON);
-   delayMicroseconds(10);
-
-   digitalWrite(TRIG, OFF);
-
-   // Returns the length of the pulse in microseconds
-   duration = pulseIn(ECHO, ON);
-
-   // Calculate the distance (in cm) based on the speed of sound
-   distance = duration/58.2;
-
-   Serial.print("Anti-collision distance: ");
-   Serial.print(distance);
-   Serial.println();
-   Serial.println();
-}
-
-
-
-// Detects if anything is in front of the podcar
-boolean isSomethingInFront()
-{
-  boolean collision_detection;
-  
-  if(distance <= 15)
-  {
-    collision_detection = true;
-  }
-
-  else
-  {
-    collision_detection = false; 
-  }
-
-  return collision_detection;
-}
-
-
-
-
 // Turns on the LED based on one of the specified states
+// [ActionId = 3, sets the state between 1-4 atm or 0 if not on]
 void setStateLED(int colorState)
 {
   // LED is red (Station arrival or collision prevention)
@@ -401,7 +378,7 @@ void setStateLED(int colorState)
       reset_latch_state = false;
       kill_latch_state = true;
     }
-    else if(kill_state < 1)
+    else if(killState())
     {
       kill_latch_state = false;
       reset_latch_state = true;
@@ -409,10 +386,8 @@ void setStateLED(int colorState)
   }
 }
 
-
-
 // Gets the state of the LED
-// Used for mobile app purposes
+// [ActionId = 4, the state between 1-4 atm or 0 if not on]
 int getStateLED()
 {
   if(digitalRead(RED) == 1)            // Red LED is on
@@ -436,21 +411,113 @@ int getStateLED()
   }
 }
 
+// Function that sets the speed of the motors
+// [ActionId = 5, setCurrentSpeed]
+void setSpeedOfMotors(int motor_speed)
+{
+  Timer3.pwm(motor1, motor_speed);
+  Timer3.pwm(motor2, motor_speed);
+}
 
+
+
+// Retrieves the speed of the motor based on the encoders
+// [ActionId = 6, currentSpeedOfMotor]
+int getSpeedOfMotors()
+{
+  return 0;
+}
+
+
+
+
+// Checks the status of the button
+bool killState()
+{
+  // Continuously check the status of the kill button
+  kill_state  = digitalRead(KILL_SWITCH);
+
+  if(kill_state < 1) {
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+
+
+// Retrieves the readings from the hall effect sensors
+bool magnetRead()
+{
+  // Checks if any magnet is read on the left of podcar
+  hall_1_state = digitalRead(HALL_SENSOR1);
+
+
+  // Checks if any magnet is read on the right of podcar
+  hall_2_state = digitalRead(HALL_SENSOR2);
+
+  if (hall_1_state == 0 || hall_2_state == 0) {
+    return true;
+  }
+
+  else {
+    return false;
+  }
+}
+
+
+
+// Function that will return the distance from the ultrasonic sensor
+int ultrasonic()
+{
+  /* The following trigPin/echoPin cycle is used to determine the distance of 
+   *  the nearest object by bouncing soundwaves off of it 
+   */
+
+   digitalWrite(TRIG, OFF);
+   delayMicroseconds(2);
+
+   digitalWrite(TRIG, ON);
+   delayMicroseconds(10);
+
+   digitalWrite(TRIG, OFF);
+
+   // Returns the length of the pulse in microseconds
+   duration = pulseIn(ECHO, ON);
+
+   // Calculate the distance (in cm) based on the speed of sound
+   distance = duration/58.2;
+
+   return distance;
+}
+
+
+
+// Detects if anything is in front of the podcar
+boolean isSomethingInFront()
+{
+  boolean collision_detection;
+  
+  if(ultrasonic() <= 15)
+  {
+    collision_detection = true;
+  }
+
+  else
+  {
+    collision_detection = false; 
+  }
+
+  return collision_detection;
+}
 
 // Function that controls the functions of the system
 void controls()
 {
-     // Changed distance from 30 cm to 15 cm due to pole obstacle
-   // LED is Red when statement is true
-   if (distance <= 15)
-   {
-    setStateLED(1);
-    setSpeedOfMotors(0);
-   }
 
-   // LED is blinking red if button is pressed
-   else if (kill_state < 1)
+  // LED is blinking red if button is pressed
+   if (killState())
    {
     // Creates a latching button
     kill_latch_state = false;
@@ -464,54 +531,43 @@ void controls()
       setSpeedOfMotors(0);
     }
    }
-
-   // Checks to see if the hall effect sensor on the left of podcar read a magnet
-   else if (hall_1_state == 0 || hall_2_state == 0)
+  
+     // Changed distance from 30 cm to 15 cm due to pole obstacle
+   // LED is Red when statement is true
+   else if (isSomethingInFront())
    {
-    setStateLED(2);
-    setSpeedOfMotors(580);
-   } 
-
-   // Checks to see if podcar is at a station
-   else if (StationId == 1 || StationId == 2 || StationId == 3 || StationId == 4)
-   {
-    setStateLED(1); 
+    setStateLED(1);
     setSpeedOfMotors(0);
-    Serial.print("Podcar is at station: ");
-    Serial.print(StationId);
-    Serial.println();
-    Serial.println();
    }
 
-   // LED should be green
+   // Checks to see if podcar is at a station
+   else if  (RC522.isCard())
+   {
+    StationId = getStationNumber();
+    setStateLED(1); 
+    setSpeedOfMotors(0);
+    //StationId = 0;
+   }
+
+   // Checks to see if the hall effect sensor on the left of podcar read a magnet
+   else if (magnetRead())
+   {
+    setStateLED(2);
+    setSpeedOfMotors(800);
+   } 
+
+   // LED should be green 
    else
    {
     setStateLED(3);
-    setSpeedOfMotors(580);
+    setSpeedOfMotors(400);
    }
+   
+   // delay 50 ms before next reading
+   delay(50);  
 }
 
 
 
-// Function that sets the speed of the motors
-// A pwm signal of 580 corresponds to a speed of ~0.82 ft/s (~0.25 m/s)
-void setSpeedOfMotors(double motor_speed)
-{
-  Timer3.pwm(motor1, motor_speed);
-  Timer3.pwm(motor2, motor_speed);
-}
 
 
-
-// Retrieves the speed of the motor based on the encoders
-double getSpeedOfMotors()
-{
-}
-
-
-
-// Function to send all requested information through Xbee??
-void sendXbee()
-{
-  
-}

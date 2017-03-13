@@ -35,7 +35,7 @@ RFID::RFID(int chipSelectPin, int NRSTPD)
  * User API
  ******************************************************************************/
 
- bool RFID::isCard() 
+ bool RFID::isCard(int check) 
  {
 	unsigned char status;
 	unsigned char str[MAX_LEN];
