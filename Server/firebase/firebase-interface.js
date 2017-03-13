@@ -13,7 +13,6 @@ var database = firebase.database();
 var usersRef = database.ref('users');
 
 
-
 /*** --= QUERY FUNCTIONS =-- ***/
 
 // Returns a reference to the currentTicket of a particular user
@@ -72,7 +71,7 @@ function setStatus(userId, statusCode) {
 
 
 /*** --= EXAMPLE CODE =-- ***/
-// Remember, these function calls are ASYNCHRONOUS, which may affect how you write your code
+// Remember: these function calls are ASYNCHRONOUS, which may affect how you write your code
 
 // Get a list of references (listOfRef) that is returned as an argument of our callback function
 getAllCurrentTickets(function(listOfRef) {

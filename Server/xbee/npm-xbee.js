@@ -62,6 +62,14 @@ function write() {
     
     serial_xbee_master.open(function(err) {
         
+        // TODO: Try writing this data to xbee
+        var data = {
+            type: 0x09, // xbee_api.constants.FRAME_TYPE.AT_COMMAND_QUEUE_PARAMETER_VALUE
+            id: 0x01, // optional, nextFrameId() is called per default
+            command: "AT",
+            commandParameter: "Hello, World! SPARTAN SUPERWAY"
+        }
+        
         console.log('Writing serial data: ' + counter++);
         serial_xbee_master.write(counter, function(err, res) {
             if (err) {
