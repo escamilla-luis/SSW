@@ -9,7 +9,7 @@ var xbeeAPI = new xbee_api.XBeeAPI({
     //raw_frames: true
 });
 
-var serialPortId = '/dev/ttyUSB1';
+var serialPortId = '/dev/ttyUSB3';
 
 var port = new SerialPort(serialPortId, {
     autoOpen: false,
@@ -23,7 +23,7 @@ port.open(function (err) {
   }
 
   // write errors will be emitted on the port since there is no callback to write
-  port.write('main screen turn on');
+  port.write("32");
 });
 
 // the open event will always be emitted
@@ -36,3 +36,7 @@ port.on('open', function() {
 port.on('data', function (data) {
   console.log('Data: ' + data);
 });
+
+// setTimeout( function () {
+
+// }, 1000);
