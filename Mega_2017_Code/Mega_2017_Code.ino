@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
                      ///// //////  //////  //////  //////  //////  //   //
                      //    //  //  // ///  //  //    //    //  //  ///  //
@@ -24,15 +23,9 @@
 /////////////////////////////////////// LIBRARIES ///////////////////////////////////////////////////////////
 
 // Libraries for the RFID, pathing algorithm, and for the motors and servo
-=======
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 #include <RFID.h>
-
-// Libraries for the RFID and for the motors
-//#include <AddicoreRFID.h>
 #include <SPI.h>
 #include <TimerThree.h>
-<<<<<<< HEAD
 #include <StackArray.h>
 #include <Servo.h>
 
@@ -42,27 +35,20 @@
 /* Note: For Xbee Pro, Channel CH = C, Pan ID = 2017
  *  
  */
-=======
-#include <SoftwareSerial.h>
-
-
-// Pin definitions
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 // Pins 0 and 1 on the Mega are used for Xbee Comms
 /* Note: For RFID reader - SDA (PIN 9), SCK (PIN 52), MOSI (PIN 51),
  *  MISO (PIN 50), RST (PIN 8).
  */
-<<<<<<< HEAD
 #define motor1          2   // Interrupt 0
 #define motor2          3   // Interrupt 1
 #define SERVO           4   // Servo pin
-=======
-#define motor1          2
-#define motor2          3
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 #define RED             10  // STOP and Error status
 #define GREEN           11  // GO status
 #define BLUE            12  // Status of the podcar
+#define motor1_enco_a   18  // Interrupt 5
+#define motor1_enco_b   19  // Interrupt 4
+#define motor2_enco_a   20  // Interrupt 3 
+#define motor2_enco_b   21  // Interrupt 2
 #define ECHO            22  // Echo pin
 #define TRIG            23  // Trig pin
 #define KILL_SWITCH     24  // Kill switch
@@ -109,6 +95,16 @@ long duration;                // Duration used to calculate distance
 int distance;                 // Stores the distance
 
 
+// Used for motor encoders
+// Encoders provide 12 counts per revolution of the motor shaft when 
+// counting both edges of both channels
+// To compute the counts/rev of gearbox output shaft, multiply gear ratio by 12
+volatile unsigned int enc_count_1 = 0;
+volatile unsigned int enc_count_2 = 0;
+float vel1, vel2;
+
+
+
 // Variables used to store the readings from the hall effect sensors
 int hall_1_state;
 int hall_2_state;
@@ -134,9 +130,6 @@ const long interval = 250;
 int  StationId = 0;
 int  checkpoint = 0;
 long SSN = 0;
-
-// Create Array to be stored as message
-int message[1];
 
 
 
@@ -170,9 +163,6 @@ int a, b;
 // Used to identify which podcar it is
 int vehicle_number = 1;
 
-SoftwareSerial XBee(0,1); //RX, TX
-
-int commands[8];
 
 
 // Initialize the servo
@@ -183,8 +173,6 @@ Servo leverArm;
 ///////////////////////////////////////// SETUP /////////////////////////////////////////////////////////////
 void setup()
 {
-
-  
   // Outputs
   pinMode(motor1, OUTPUT);
   pinMode(motor2, OUTPUT);
@@ -195,6 +183,10 @@ void setup()
   
 
   // Inputs
+  pinMode(motor1_enco_a, INPUT);
+  pinMode(motor1_enco_b, INPUT);
+  pinMode(motor2_enco_a, INPUT);
+  pinMode(motor2_enco_b, INPUT);
   pinMode(ECHO, INPUT);
   pinMode(KILL_SWITCH, INPUT_PULLUP);
   pinMode(RESET, INPUT_PULLUP);
@@ -206,13 +198,21 @@ void setup()
   pinMode(SEND_PATH2, INPUT_PULLUP);
 
 
+  digitalWrite(motor1_enco_a, HIGH);       // Turn on pull-up resistors
+  digitalWrite(motor1_enco_b, HIGH);       
+  digitalWrite(motor2_enco_a, HIGH);     
+  digitalWrite(motor2_enco_b, HIGH);     
+
+
+  // Encoder pins
+
+
   // Set TimerThree to signal at 20Hz frequency (20 times/sec)
   Timer3.initialize(1000000 / 1000);
 
   
   // Change this to 57600 for Xbee Comm
-  XBee.begin(57600);
-  Serial.begin(57600);
+  Serial.begin(9600);
 
 
   // Start timer3 PWM for motors
@@ -226,120 +226,44 @@ void setup()
 
   /* Initialize the RFID reader */
   RC522.init();
-}
 
 
-<<<<<<< HEAD
   // Setup the servo
   leverArm.attach(SERVO);
 
   leverArm.write(90);
 }
-=======
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 
-String readString = "";
-
- byte checksum = 0x00;
-  bool string_enable = false;
-  String string_complete = "";
-  int result = 0;
-
-  
-/**
-  * Xbee communication will have a certain protocol in the form of an int array.
-  * The int array will signal the Arduino to perform an action. The protocol will be in the following form:
-  * [ActionId, ....(actions for each signal)]
-  * Above every function, there will be an explanation of what each array will do based on the given number input between 0-9 for each index.
-*/
 
 
 //////////////////////////////////////// MAIN CODE //////////////////////////////////////////////////////////
 void loop()
 { 
-  //Serial.write('a');
-  //Check for XBee
-  
-
-  receiveXbeeMessage();
-
-  if (commands[0] > 0){
-    resolvePacketData();
-  }
-
-  
   // Checks on the state of the kill button
-  //killState();
+  killState();
 
 
   // Function that will check to see if any of the hall effect sensors read a magnet
-  //magnetRead();
+  magnetRead();
+
+
+  // Retrieves the station that the podcar is at if a tag is read
+  getStationandCheckpointNumber();
+
+
+  // Retrieves the distance from the ultrasonic sensor and returns the state of the collision
+  // detection system
+  ultrasonic();
+  isSomethingInFront();
+
+
+  // Retrieves the state of the RGB LED
+  getStateLED();
   
 
   // System controls
-  //controls();
-}
+  controls();
 
-void resolvePacketData() {
-
-  // initialization of important variables
-  int actionId = commands[0];
-  int speedOfMotors;
-
-<<<<<<< HEAD
-  // Retrieves the station that the podcar is at if a tag is read
-  getStationandCheckpointNumber();
-=======
-  switch (actionId) {
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
-
-    // setNextStation
-    case 1: Serial.println("setstation");
-    setNextStation(commands[1]);
-    break;
-
-    // getNextStation
-    case 2: Serial.println("getstation");
-    //sendxbee(commands[1], commands[2],...);
-    break;
-
-    // SetLED
-    case 3: Serial.println("setLED");
-    setStateLED(commands[1]);
-    break;
-
-    //getLED
-    case 4: Serial.println("getLED");
-    //sendxbee(commands[1], commands[2],...);
-    break;
-
-    //setSpeed
-    case 5: Serial.println("setSpeed");
-    speedOfMotors = commands[1] * 100;
-    setSpeedOfMotors(speedOfMotors);
-    break;
-
-    //getSpeed
-    case 6: Serial.println("getSpeed");
-    //sendxbee(commands[1], commands[2],...);
-    break;
-  }
-
-  commands[0] = 0;
-  
-}
-
-void receiveXbeeMessage() {
-
-  char in;
-  int additive;
-  int counterForCommands = 0;
-
-  // Next, fill the array with the list of commands.
-  while(Serial.available()) {
-    delay(10);  //small delay to allow input buffer to fill
-
-<<<<<<< HEAD
 
   // Retrieve the speed of the motors
   getSpeedOfMotors();
@@ -352,57 +276,20 @@ void receiveXbeeMessage() {
   
   // Lever arm should switch with right arm up regardless of path destination
   IfDumbMagnetDetected();
-=======
-    in = (char)Serial.read();
-    additive = (int)in - 48;
-    
-    commands[counterForCommands] = additive;
-    counterForCommands++;
-  }
-
-//  if (commands[0] > 0) {
-//    Serial.println(commands[0]);
-//    Serial.println(commands[1]);
-//    Serial.println(commands[2]);
-//    Serial.println(commands[3]);
-//    Serial.println(commands[4]);
-//    Serial.println(commands[5]);
-//    Serial.println(commands[6]);
-//    Serial.println(commands[7]);
-//    commands[0] = 0;
-//  }
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 }
 
-// Function to send all requested information through Xbee??
-void sendXbee()
-{
-  
-}
 
-// Sets the next station number
-// [ActionId = 1, lengthOfArray = 3, the next station number between 1-4]
-void setNextStation(int station_number)
-{
-  Serial.println("in setStation");
-}
 
 ///////////////////////////////////// GET STATION AND CHECKPOINT NUMBER /////////////////////////////////////
 // Retrieves the Station ID
-<<<<<<< HEAD
 int getStationandCheckpointNumber()
-=======
-// [ActionID = 2, StationNumber last visited between 1-4]
-int getStationNumber()
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 {
-  //StationId = 0;
-  
+  /* Has a card been detected? */
+  if (RC522.isCard())
+  {
     /* If so then get its serial number */
     RC522.readCardSerial();
-    SSN = RC522.serNum[0];
 
-<<<<<<< HEAD
 
     /* Get the Serial number of the tag */
 
@@ -414,43 +301,28 @@ int getStationNumber()
 
     // For round tags, SSN = 85
     if (SSN == 35)
-=======
-    if (SSN == 85)
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
     {
       StationId = 1;
+      return StationId;
     }
-<<<<<<< HEAD
     // SSN = 101
     if (SSN == 110)
-=======
-
-    if (SSN == 101)
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
     {
       StationId = 2;
+      return StationId;
     }
-<<<<<<< HEAD
     // SSN = 149
     if (SSN == 103)
-=======
-
-    if (SSN == 149)
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
     {
       StationId = 3;
+      return StationId;
     }
-<<<<<<< HEAD
     // SSN = 21
     if (SSN == 132)
-=======
-
-    if (SSN == 21)
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
     {
       StationId = 4;
+      return StationId;
     }
-<<<<<<< HEAD
 
     // Next four statements are for checkpoint cards
     if (SSN == 107)
@@ -561,29 +433,25 @@ void ultrasonic()
 boolean isSomethingInFront()
 {
   boolean collision_detection;
-=======
-
-    // Shows the Station Number it is at
-    Serial.println("The Station Id is:  ");
-    Serial.println(StationId);
-
-    RC522.isCard();
-    
-    return StationId;
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
   
-  delay(50);
+  if(distance <= 15)
+  {
+    collision_detection = true;
+  }
+
+  else
+  {
+    collision_detection = false; 
+  }
+
+  return collision_detection;
 }
 
-<<<<<<< HEAD
 
 
 
 /////////////////////////////////////// SET STATE LED ///////////////////////////////////////////////////////
-=======
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 // Turns on the LED based on one of the specified states
-// [ActionId = 3, sets the state between 1-4 atm or 0 if not on]
 void setStateLED(int colorState)
 {
   // LED is red (Station arrival or collision prevention)
@@ -648,7 +516,7 @@ void setStateLED(int colorState)
       reset_latch_state = false;
       kill_latch_state = true;
     }
-    else if(killState())
+    else if(kill_state < 1)
     {
       kill_latch_state = false;
       reset_latch_state = true;
@@ -656,14 +524,11 @@ void setStateLED(int colorState)
   }
 }
 
-<<<<<<< HEAD
 
 
 ///////////////////////////////////// GET STATE LED /////////////////////////////////////////////////////////
-=======
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 // Gets the state of the LED
-// [ActionId = 4, the state between 1-4 atm or 0 if not on]
+// Used for mobile app purposes
 int getStateLED()
 {
   if(digitalRead(RED) == 1)            // Red LED is on
@@ -687,117 +552,22 @@ int getStateLED()
   }
 }
 
-// Function that sets the speed of the motors
-// [ActionId = 5, setCurrentSpeed]
-void setSpeedOfMotors(int motor_speed)
-{
-  Timer3.pwm(motor1, motor_speed);
-  Timer3.pwm(motor2, motor_speed);
-}
 
 
-
-<<<<<<< HEAD
 //////////////////////////////////////// CONTROLS ///////////////////////////////////////////////////////////
-=======
-// Retrieves the speed of the motor based on the encoders
-// [ActionId = 6, currentSpeedOfMotor]
-int getSpeedOfMotors()
-{
-  return 0;
-}
-
-
-
-
-// Checks the status of the button
-bool killState()
-{
-  // Continuously check the status of the kill button
-  kill_state  = digitalRead(KILL_SWITCH);
-
-  if(kill_state < 1) {
-    return true;
-  }
-  else {
-    return false;
-  }
-}
-
-
-
-// Retrieves the readings from the hall effect sensors
-bool magnetRead()
-{
-  // Checks if any magnet is read on the left of podcar
-  hall_1_state = digitalRead(HALL_SENSOR1);
-
-
-  // Checks if any magnet is read on the right of podcar
-  hall_2_state = digitalRead(HALL_SENSOR2);
-
-  if (hall_1_state == 0 || hall_2_state == 0) {
-    return true;
-  }
-
-  else {
-    return false;
-  }
-}
-
-
-
-// Function that will return the distance from the ultrasonic sensor
-int ultrasonic()
-{
-  /* The following trigPin/echoPin cycle is used to determine the distance of 
-   *  the nearest object by bouncing soundwaves off of it 
-   */
-
-   digitalWrite(TRIG, OFF);
-   delayMicroseconds(2);
-
-   digitalWrite(TRIG, ON);
-   delayMicroseconds(10);
-
-   digitalWrite(TRIG, OFF);
-
-   // Returns the length of the pulse in microseconds
-   duration = pulseIn(ECHO, ON);
-
-   // Calculate the distance (in cm) based on the speed of sound
-   distance = duration/58.2;
-
-   return distance;
-}
-
-
-
-// Detects if anything is in front of the podcar
-boolean isSomethingInFront()
-{
-  boolean collision_detection;
-  
-  if(ultrasonic() <= 15)
-  {
-    collision_detection = true;
-  }
-
-  else
-  {
-    collision_detection = false; 
-  }
-
-  return collision_detection;
-}
-
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
 // Function that controls the functions of the system
 void controls()
 {
+     // Changed distance from 30 cm to 15 cm due to pole obstacle
+   // LED is Red when statement is true
+   if (distance <= 15)
+   {
+    setStateLED(1);
+    setSpeedOfMotors(0);
+   }
 
-  // LED is blinking red if button is pressed
-   if (killState())
+   // LED is blinking red if button is pressed
+   else if (kill_state < 1)
    {
     // Creates a latching button
     kill_latch_state = false;
@@ -811,14 +581,13 @@ void controls()
       setSpeedOfMotors(0);
     }
    }
-  
-     // Changed distance from 30 cm to 15 cm due to pole obstacle
-   // LED is Red when statement is true
-   else if (isSomethingInFront())
+
+   // Checks to see if the hall effect sensor on the left of podcar read a magnet
+   else if (hall_1_state == 0 || hall_2_state == 0)
    {
-    setStateLED(1);
-    setSpeedOfMotors(0);
-   }
+    setStateLED(2);
+    setSpeedOfMotors(580);
+   } 
 
    // Checks to see if any of the checkpoints have been read
    else if (checkpoint == 1 || checkpoint == 2 || checkpoint == 3 || checkpoint == 4)
@@ -835,47 +604,27 @@ void controls()
    }
 
    // Checks to see if podcar is at a station
-   else if  (RC522.isCard())
+   else if (StationId == 1 || StationId == 2 || StationId == 3 || StationId == 4)
    {
-    StationId = getStationNumber();
     setStateLED(1); 
     setSpeedOfMotors(0);
-<<<<<<< HEAD
 //    Serial.print("Podcar is at station: ");
 //    Serial.print(StationId);
 //    Serial.println();
 //    Serial.println();
-=======
-    //StationId = 0;
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
    }
 
-   // Checks to see if the hall effect sensor on the left of podcar read a magnet
-   else if (magnetRead())
-   {
-    setStateLED(2);
-    setSpeedOfMotors(800);
-   } 
-
-   // LED should be green 
+   // LED should be green
    else
    {
     setStateLED(3);
-<<<<<<< HEAD
     setSpeedOfMotors(580);
 
-=======
-    setSpeedOfMotors(400);
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
    }
-   
-   // delay 50 ms before next reading
-   delay(50);  
 }
 
 
 
-<<<<<<< HEAD
 ///////////////////////////////////// SET SPEED OF MOTORS ///////////////////////////////////////////////////
 // Function that sets the speed of the motors
 // A pwm signal of 580 corresponds to a speed of ~0.82 ft/s (~0.25 m/s)
@@ -1124,7 +873,3 @@ void IfDumbMagnetDetected()
     delay(500);
   }
 }
-=======
-
-
->>>>>>> c5ae3c8c223b8fc649166ae20185b0c4298c09c6
