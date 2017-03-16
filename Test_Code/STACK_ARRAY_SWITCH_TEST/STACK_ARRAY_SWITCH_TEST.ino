@@ -2,9 +2,9 @@
 
 #include <StackArray.h>
 #include <Servo.h>
-#define SERVO_PIN     3  // Pin for Servo
-#define HALL_SENSOR1  2  // Smart Hall Effect Sensor
-#define HALL_SENSOR2  4  // Dumb Hall Effect Sensor
+#define SERVO_PIN     4  // Pin for Servo
+#define HALL_SENSOR1  26  // Smart Hall Effect Sensor
+#define HALL_SENSOR2  27  // Dumb Hall Effect Sensor
 #define SEND_PATH1 6
 #define SEND_PATH2 7
 
@@ -87,7 +87,6 @@ void Signal2Path2Stack() //button1 and button2 represent different signals sent
 }  
 
 //---------------------------WhichPath------------------------------
-
 int WhichPath(int a)
 {
   switch(a)
@@ -144,6 +143,7 @@ int WhichPath(int a)
 b=a;
 return b;
 }
+
 
 //------------------------GenerateStack-------------------------
 
@@ -253,7 +253,7 @@ void IfSmartSensorActivated()
     switch(laststackvalue) //Based on the value of the last element, switch or not don't switch
       {
       case 1: 
-      myservo.write(5);
+      myservo.write(60);
       Serial.println("Switched");
       break;
 
@@ -271,7 +271,7 @@ void IfDumbSensorActivated()
 {
   if (hall_2_state==0) //If dumb sensor detects a magnet
   {
-    myservo.write(80);
+    myservo.write(160);
     Serial.print("Dumb\n");
     delay(500);
   }
