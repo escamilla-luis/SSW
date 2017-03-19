@@ -1,3 +1,6 @@
+var threads = require('threads');
+var config = threads.config;
+var spawn = threads.spawn;
 var messenger = require('messenger');
 var mysql = require('mysql');
 var firebase = require('firebase');
@@ -64,23 +67,25 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 	
 	var data = {firebaseUserId: firebaseUserId}
 	
-	switch (clientNumber) {
-		case 1:
-			console.log("speaker1.request()");
-			speaker1.request('assignTicket', data, clientCallback);
-			break;
-		case 2:
-			speaker2.request('assignTicket', data, clientCallback);
-			break;
-		case 3:
-			speaker3.request('assignTicket', data, clientCallback);
-			break;
-		case 4:
-			speaker4.request('assignTicket', data, clientCallback);
-			break;
-		default:
-			console.log('Error: Invalid client number specified');
-	}	
+//	switch (clientNumber) {
+//		case 1:
+//			console.log("speaker1.request()");
+//			speaker1.request('assignTicket', data, clientCallback);
+//			break;
+//		case 2:
+//			speaker2.request('assignTicket', data, clientCallback);
+//			break;
+//		case 3:
+//			speaker3.request('assignTicket', data, clientCallback);
+//			break;
+//		case 4:
+//			speaker4.request('assignTicket', data, clientCallback);
+//			break;
+//		default:
+//			console.log('Error: Invalid client number specified');
+//	}
+	console.log("Assigning " + data.firebaseUserId + " to " + clientNumber);
+	spawnClientThread(clientNumber, data.firebaseUserId);
 }
 
 // Demo code that will send each client 'userId' every 2 seconds.
@@ -94,7 +99,18 @@ setInterval(function() {
 	if (podNumber > 4) {
 		podNumber = 1;
 	}
-}, 2000);
+}, 4000);
+
+
+function spawnClientThread(pod_num, user_id) {
+	var thread = spawn('client-thread.js');
+	
+	thread
+		.send({pod_num: pod_num, uid: user_id})
+		.on('message', function(message) {
+				console.log(message + 'Pod completed Schedule');
+	});
+}
 
 //a function thats takes a userID and their current ticket and associates them with an available pod
 //function 
