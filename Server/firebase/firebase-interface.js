@@ -17,14 +17,14 @@ var usersRef = database.ref('users');
 
 // Returns a reference to the currentTicket of a particular user
 // -userId: String of the user's id in Firebase
-function getCurrentTicketFromUser(userId) {
+exports.getCurrentTicketFromUser = function getCurrentTicketFromUser(userId) {
     return usersRef.child(userId).child('currentTicket');
 }
 
 // Returns a snapshot of the reference in firebase; used for querying data
 // -ref: Reference to node in Firebase
 // -func: Function to call after retrieving the snapshot
-function getSnapshot(ref, func) {
+exports.getSnapshot = function getSnapshot(ref, func) {
     ref.once('value')
        .then(function(snapshot) {
             func(snapshot);
@@ -34,7 +34,7 @@ function getSnapshot(ref, func) {
 
 // Returns a list of REFERENCES to all current tickets
 // -func: The function to call after retrieving all the tickets
-function getAllCurrentTickets(func) {
+exports.getAllCurrentTickets = function getAllCurrentTickets(func) {
     var currentTicketReferences = [];
     usersRef.once('value')
             .then(function (users) {
@@ -56,7 +56,7 @@ function getAllCurrentTickets(func) {
 // Sets the eta time for a ticket under a particular user
 // -userId: String of user's id in Firebase
 // -time: Integer of time left
-function setEta(userId, time) {
+exports.setEta = function setEta(userId, time) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('eta').set(time);
 }
@@ -64,7 +64,7 @@ function setEta(userId, time) {
 // Sets the status code for a ticket under a particular user
 // -userId: String of user's id in Firebase
 // -statusCode: Integer that specifies the status code
-function setStatus(userId, statusCode) {
+exports.setStatus = function setStatus(userId, statusCode) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('status').set(statusCode);
 }
@@ -74,7 +74,7 @@ function setStatus(userId, statusCode) {
 // Remember: these function calls are ASYNCHRONOUS, which may affect how you write your code
 
 // Get a list of references (listOfRef) that is returned as an argument of our callback function
-getAllCurrentTickets(function(listOfRef) {
+exports.getAllCurrentTickets = getAllCurrentTickets(function(listOfRef) {
     // Iterate through each reference
     listOfRef.forEach(function(ref) {
         // Get the snapshot of the reference (ref) returned as an argument of our callback function

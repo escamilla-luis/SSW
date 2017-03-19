@@ -89,7 +89,7 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 }
 
 // Demo code that will send each client 'userId' every 2 seconds.
-var userId = 1234;
+var userId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
 var podNumber = 1;
 setInterval(function() {
 	assignTicketToClient(userId, podNumber);
