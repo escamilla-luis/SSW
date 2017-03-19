@@ -12,29 +12,55 @@ firebase.initializeApp(config);
 var database = firebase.database();
 var usersRef = database.ref('users');
 
+/*** --= INTERNAL FUNCTIONS =-- ***/
+// Used interally by interface, not to be called outside of this fuile
 
-/*** --= QUERY FUNCTIONS =-- ***/
-
-// Returns a reference to the currentTicket of a particular user
+// Returns a REFERENCE to the currentTicket of a particular user
 // -userId: String of the user's id in Firebase
-exports.getCurrentTicketFromUser = function getCurrentTicketFromUser(userId) {
+function getCurrentTicketFromUser(userId) {
     return usersRef.child(userId).child('currentTicket');
 }
 
 // Returns a snapshot of the reference in firebase; used for querying data
 // -ref: Reference to node in Firebase
-// -func: Function to call after retrieving the snapshot
-exports.getSnapshot = function getSnapshot(ref, func) {
+// -callback: Function to call after retrieving the snapshot
+function getSnapshot(ref, callback) {
     ref.once('value')
        .then(function(snapshot) {
-            func(snapshot);
+            callback(snapshot);
         });
 }
 
+/*** --= QUERY FUNCTIONS =-- ***/
 
-// Returns a list of REFERENCES to all current tickets
-// -func: The function to call after retrieving all the tickets
-exports.getAllCurrentTickets = function getAllCurrentTickets(func) {
+// Parses the ticket into a JSON object that is returned in a callback function
+// -userId: String of the user's id in Firebase
+// -onDataReceived: callback function which we pass our JSON ticket to
+exports.getCurrentTicketJSON = function getCurrentTicketJSON(userId, onDataReceived) {
+    var ticketRef = getCurrentTicketFromUser(userId);
+    ticketRef.once('value')
+             .then(function(snapshot) {
+                var eta = snapshot.val('eta');
+                var from = snapshot.val('from');
+                var to = snapshot.val('to');
+                var status = snapshot.val('status');
+                var isNewTicket = snapshot.val('isNewTicket');
+                var timerOn = snapshot.val('timerOn');
+                
+                onDataReceived({
+                    eta: eta,
+                    from: from,
+                    to: to,
+                    status: status,
+                    isNewTicket: isNewTicket,
+                    timerOn: timeOn
+                });
+            });
+}
+
+// Returns a list of Firebase REFERENCES to all current tickets
+// -onReceive: The function to call after retrieving all the tickets
+exports.getAllCurrentTicketsRefs = function getAllCurrentTicketsRefs(onRetrieve) {
     var currentTicketReferences = [];
     usersRef.once('value')
             .then(function (users) {
@@ -45,10 +71,9 @@ exports.getAllCurrentTickets = function getAllCurrentTickets(func) {
                     currentTicketReferences.push(ticketRef);
                 });
                 
-                func(currentTicketReferences);
+                onRetrieve(currentTicketReferences);
             });
 }
-
 
 
 /*** --= STORE FUNCTIONS =-- ***/
@@ -68,19 +93,3 @@ exports.setStatus = function setStatus(userId, statusCode) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('status').set(statusCode);
 }
-
-
-/*** --= EXAMPLE CODE =-- ***/
-// Remember: these function calls are ASYNCHRONOUS, which may affect how you write your code
-
-// Get a list of references (listOfRef) that is returned as an argument of our callback function
-exports.getAllCurrentTickets = getAllCurrentTickets(function(listOfRef) {
-    // Iterate through each reference
-    listOfRef.forEach(function(ref) {
-        // Get the snapshot of the reference (ref) returned as an argument of our callback function
-        getSnapshot(ref, function(snapshot) {
-            // Log the value after retrieving the snapshot in the callback function
-            console.log('status: ' + snapshot.child('status').val());
-        });
-    });
-});
