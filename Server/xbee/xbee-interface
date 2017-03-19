@@ -3,67 +3,44 @@ var SerialPort = require('serialport');
 var xbee_api = require('xbee-api');
 var C = xbee_api.constants;
 
-var serial_xbee_master = null;
-var xbeeAPI = new xbee_api.XBeeAPI({
-    api_mode: 1,
-    module: 'Any',
-    rawr_frames: true
+
+// Path to serialport may be different on different machines
+var pathToPort = '/dev/tty.usbserial-DN01J8BJ';
+var port = new SerialPort(pathToPort, {
+    autoOpen: false,
+    baudrate: 57600
 });
-
-
-// End-Device should be master? Coordinator should be worker?
-// TODO: **Test this thoroughly**
-
 
 /*** --= XBEE FUNCTIONS =-- ***/
 
-// Connects to an xbee through a serial port (usb connection).
-// -path: path to serialport that xbee is connected to (ex. /dev/tty.usbserial-DNO1IYP9)
-// -baudrate: the baudrate value to set
-// -callback: optional callback function
-function connectToSerialPort(path, baudrate, callback) {
-    serial_xbee_master = new SerialPort(path, {
-        baudrate: baudrate,
-        parser: xbeeAPI.rawParser()
-    }, callback);
-}
-
-
-// Returns true if there is a serial port connection to an xbee, false otherwise.
-function hasSerialXbee() {
-    if (serial_xbee_master == null) {
-        return true;
-    }
-    
-    return false;
-}
-
-// Writes a packet to the xbee
-// -command: the first value of the packet to send to the xbee
-// -commandParameter: any additional values that you wish to send to the xbee after the 'command' value
-function writeToXbee(command, commandParameter) {
-    // Check if serial xbee is connected yet
-    if (!hasSerialXbee()) {
-        console.log('No xbee connection exists! Please connect to an xbee via a serial port before writing to an xbee.');
-        return;
-    }
-    
-    serial_xbee_master.on('open', function(data) {
-        console.log('opened!');
-        var packet = {
-            type: 0x09, // xbee_api.constants.FRAME_TYPE.AT_COMMAND_QUEUE_PARAMETER_VALUE
-            id: 0x01, // Optional, nextFrameId() is called per default
-            command: command, // The first value of the packet to send to the xbee
-            commandParameter, commandParameter // These values will come after the 'command' value
-        };
-        
-        serial_xbee_master.write(xbeeAPI.buildFrame(data), function(err, res) {
-            if (err) {
-                console.log('err')
-            } else {
-                console.log('written bytes: ' + util.inspect(res));
+function writeToXbee(value, callback) {
+    port.on('open', function() {
+        port.on('data', function (fromXbee) {
+            
+            if (callback) {
+                // Handle data from xbee
+                console.log('Data received: ' + fromXbee);
+                callback(fromXbee);
             }
+            
+            port.close();
         });
+        
+        console.log('Writing value to xbee');
+        port.write(value);
     });
     
+    port.open(function (err) {
+        if (err) {
+            console.log('Error opening port: ', err.message);
+            console.log('Retrying to open port...');
+            setTimeout(function() {
+                writeToXbee(value);
+            }, 1000);
+        } else {
+            console.log('Port opened');
+        }
+    });
 }
+
+writeToXbee('33');
