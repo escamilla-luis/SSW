@@ -40,12 +40,12 @@ exports.getCurrentTicketJSON = function getCurrentTicketJSON(userId, onDataRecei
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.once('value')
              .then(function(snapshot) {
-                var eta = snapshot.val('eta');
-                var from = snapshot.val('from');
-                var to = snapshot.val('to');
-                var status = snapshot.val('status');
-                var isNewTicket = snapshot.val('isNewTicket');
-                var timerOn = snapshot.val('timerOn');
+                var eta = snapshot.child('eta').val();
+                var from = snapshot.child('from').val();
+                var to = snapshot.child('to').val();
+                var status = snapshot.child('status').val();
+                var isNewTicket = snapshot.child('isNewTicket').val();
+                var timerOn = snapshot.child('timerOn').val();
                 
                 onDataReceived({
                     eta: eta,
