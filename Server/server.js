@@ -24,8 +24,8 @@ var clientCallback = function (data) {
 	podSchedule[data.podNumber] = data.podStatus;
 };
 
-var listener = messenger.createListener(8001);
-spawnClientThread(1, 2, 8001);
+var speaker = messenger.createSpeaker(8001);
+//spawnClientThread(1, 2, 8001);
 
 firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		// snapshot = snapshot of ticket
@@ -54,18 +54,31 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		}
 });
 
+//var podNum = 1;
+//setInterval(function() {
+//	console.log('Podschedule: ' + podSchedule);
+//	fillIfAvailable(podNum);
+//	podNum++;
+//}, (Math.random() * 10) + 1000);
+
 function spawnClientThread(podNum, userId, portNum) {
+	console.log('spawning client');
 	var thread = spawn('client.js');
 	thread
 		.send({podNum: podNum, userId: userId, portNum: portNum})
 		.on('done', function(message) {
 			if (message.killThread) {
 				console.log('Killing thread');
+				
 				thread.kill();
 				
 				// Free pod schedule and dequeue users off overflow (if any)
 				podSchedule[message.podNum] = 'free';
-				dequeueOverflowSchedule();
+				dequeueOverflow();
+			} else {
+//				var podNum = message.podNum;
+//				var stationTo = message.stationTo;
+//				port.write(stationTo)
 			}
 		});
 }
@@ -83,11 +96,11 @@ function fillIfAvailable(userId) {
 	}
 	
 	// Enqueue user to pod
-	overflowSchedule.push(userID);
+	overflowQueue.push(userId);
 }
 
 // Searches for an available pod and add a user to the schedule
-function addUserToPodSchedule(userID) {
+function addUserToPodSchedule(userId) {
 	
 	podSchedule.every(function(item, index) {
 		if (item == 'free') {
@@ -111,7 +124,7 @@ function assignTicketToClient(firebaseUserId, clientNumber) {
 
 // Dequeues a user off of the overflow schedule (if any) and 
 // adds that user to the overflow schedule
-function dequeueOverflowSchedule() {
+function dequeueOverflow() {
 	var userId; // Firebase userId
 	if (userId = overflowQueue.shift()) {
 		addUserToPodSchedule(userId);
