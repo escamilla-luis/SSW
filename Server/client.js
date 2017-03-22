@@ -19,6 +19,9 @@ module.exports = function(input, done) {
         message.reply({str: "Client"});
     });
     
+    console.log('kill me');
+    done({podNum: pod_num, killThread: true});
+
 //    firebase.getCurrentTicketJson(user_id, function(ticketdata) {
 //        status = ticketdata.status;
 //        console.log(status);
