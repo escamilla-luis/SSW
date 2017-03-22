@@ -1,49 +1,16 @@
-var utils = require('./utils.js');
+var threads = require('threads');
+var config = threads.config;
+var spawn = threads.spawn;
 var messenger = require('messenger');
 var mysql = require('mysql');
-var firebase = require('firebase');
+var firebase = require('./interfaces/firebase-interface.js');
 var mysqlEvents = require('mysql-events');
-
-// Initialize Firebase with our Spartan Superway database information
-var config = {
-	apiKey: "AIzaSyA4tiWKhfsGzygbRWgwfRb76LN4fg7gA5Q",
-	authDomain: "spartan-superway.firebaseapp.com",
-	databaseURL: "https://spartan-superway.firebaseio.com",
-	storageBucket: "spartan-superway.appspot.com",
-};
-firebase.initializeApp(config);
-
-// MySQL database stuff
-//var con = mysql.createConnection({
-//	host:'localhost',
-//	user:'root',
-//	password:'password',
-//	database:'SSW'
-//})
-//
-//var dsn = {
-//	host:     'localhost',
-//	user:     'root',
-//	password: 'password'
-//};
-//
-//con.connect(function(err){
-//	if(err) {
-//		console.log('Error connecting to Database')
-//		return;
-//	}
-//	console.log('Connection established...')
-//})
-
+var xbee = require('./interfaces/xbee-interface.js');
+var SerialPort = require('serialport');
 
 // Server/Client code
-
-var speaker1 = messenger.createSpeaker(8001);
-var speaker2 = messenger.createSpeaker(8002);
-var speaker3 = messenger.createSpeaker(8003);
-
-var podSchedule = ['free', 'free', 'free'];
-var overflowSchedule = [];
+var podSchedule = ['free', 'free', 'free', 'free'];
+var overflowQueue = []; // .push() to enqueue, .shift() to dequeue
 
 // This callback gets executed when the client sends the server a reply 
 // letting it know that it's task is completed
@@ -57,135 +24,102 @@ var clientCallback = function (data) {
 	podSchedule[data.podNumber] = data.podStatus;
 };
 
+function spawnClientThread(pod_num, user_id) {
+	var thread = spawn('client.js');
+	thread
+		.send({pod_num: pod_num, uid: user_id})
+		.on('message', function(message) {
+				console.log(message + 'Pod completed Schedule');
+	});
+}
+
+
+firebase.setListenerForAllCurrentTickets(function(snapshot) {
+		// snapshot = snapshot of ticket
+		var userId = snapshot.key;
+		var firstName = snapshot.child('firstName').val();
+		var lastName = snapshot.child('lastName').val();
+		console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
+
+		// Only assign ticket to client-thread if 'isTicketAlive' == true
+		// Worker threads will fire off listeners as they make changes to the ticket data,
+		// we use isTicketAlive to negate the server handling the same ticket over and over
+		var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
+		if (isNewTicket == true) {
+			console.log('New ticket detected!');
+							
+			// Handle new ticket
+			var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
+			mutableTicketRef.child('isNewTicket').set(false);
+										
+			// TODO: Get scheduling assignment right
+			assignTicketToClient(userId);
+			
+			// Do something relevant with userId...
+			var mutableEtaRef = mutableTicketRef.child('eta');
+			var mutableStatusRef = mutableTicketRef.child('status');
+		}
+	});
+
+
+/** -== POD SCHEDULING FUNCTIONS ==- **/
+
 // We can call this function here when there is a new ticket to deal
 // with from Firebase. The eventListener on Firebase will provide us
 // the userId. From there we can provide this function the available client #
 function assignTicketToClient(firebaseUserId, clientNumber) {
 	
-	var data = {firebaseUserId: firebaseUserId}
-	
-	switch (clientNumber) {
-		case 1:
-			console.log("speaker1.request()");
-			speaker1.request('assignTicket', data, clientCallback);
-			break;
-		case 2:
-			speaker2.request('assignTicket', data, clientCallback);
-			break;
-		case 3:
-			speaker3.request('assignTicket', data, clientCallback);
-			break;
-		default:
-			console.log('Error: Invalid client number specified');
-	}	
+	var data = {firebaseUserId: firebaseUserId};
+	console.log("Assigning " + data.firebaseUserId + " to " + clientNumber);
+	spawnClientThread(clientNumber, data.firebaseUserId);
 }
 
-// Firebase stuff
-var database = firebase.database();
-
-// Function that sets listener on each user (individually)
-function listenForTickets() {
-
-
-	// TEST for demo - removelater
-	var count = 1;	
-	
-	var usersRef = database.ref('users');
-	usersRef.once('value')
-		.then(function(users) {
-			users.forEach(function(user) {
-				usersRef.child(user.key).on('value', function(snapshot) {
-					
-					// Only perform something relevant on ticket if 'isTicketAlive' == true
-					var userId = snapshot.key;
-					console.log('userId: ' + userId);
-
-					var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
-					if (isNewTicket == true) {
-						console.log('Ticket is new!');
-						
-						// Handle ticket here
-						var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
-						mutableTicketRef.child('isNewTicket').set(false);
-						
-						// TEST CODE - remove later
-						console.log('count: ' + count);
-						assignTicketToClient(userId, count++);
-						if (count > 3) {
-							count = 1;
-						}
-					
-						// Do something relevant with userId...
-						var mutableEtaRef = mutableTicketRef.child('eta');
-						var mutableStatusRef = mutableTicketRef.child('status');
-					}
-				});
-			});
-		});
-}
-
-listenForTickets();
-
-//a function that checks for an available pod
+// Searches the pod schedule for an available pod. Returns true if there
+// is an available pod, false otherwise
 function checkForAvailablePod() {
-
-	var thecheck = false;
-
-	for (var i = 0; i < podSchedule.length; i++) {
-		if (podSchedule[i] == 'free') {
-			thecheck = true;
-			break;
-		}
-	};
-
-	return thecheck;
-
-}
-
-
-//a function that fill users based on available pod status
-function fillIfAvailable(userID) {
 	
-	//check if its available
+	var isAvailable = false;
+	podSchedule.every(function (item) { // .every works like .forEach() except it allows us to break out of the loop
+		if (item == 'free') {
+			isAvailable = true;
+			return false; // breaks out of .every() function.
+		}
+		return true; // continues .every() function
+	});
+	return isAvailable;
+}
+
+// A function that fill users based on available pod status
+//  If no pods are available, it will add the user to the overflowQueue
+function fillIfAvailable(userId) {
+	
+	// Check if its available
 	if (checkForAvailablePod()) {
-
-		//check overflow for users waiting for a ride
-		if (overflowSchedule.length != 0) {
-			console.log('adding from overflow')
-			addUserToPodSchedule(overflowSchedule[0]);
-			overflowSchedule.splice(0, 1);
-		}
-
-		//insert new user from the server
-		else {
-			addUserToPodSchedule(userID);
-		}
+		addUserToPodSchedule(userId);
+		return;
 	}
-
-	//add a user to the overflow if the main queue is full
-	else {
-		overflowSchedule.push(userID);
-	}
+	
+	overflowSchedule.push(userID);
 }
 
-//a function that adds a user to the schedule
-function addUserToPodSchedule(userID){
-	for (var i = 0; i < podSchedule.length; i++) {
-		if(podSchedule[i] == 'free') {
-			podSchedule[i] = userID;
-			i = 5;
+// Searches for an available pod and add a user to the schedule
+function addUserToPodSchedule(userID) {
+	
+	podSchedule.every(function(item, index) {
+		if (item == 'free') {
+			podSchedule[index] = userId;
+			return false;  // Break out of loop
 		}
-	};
+		return true; 		// Continue loop
+	});
 }
 
-//remove a user from the pod schedule when done
-function removeUserFromPodSchedule(userID){
-	for (var i = 0; i < podSchedule.length; i++) {
-		if (podSchedule[i] == userID) {
-			podSchedule[i] = 'free';
-			i = 5;
+// Searches for a user in the pod schedule and removes the user
+function removeUserFromPodSchedule(userId) {
+	
+	podSchedule.forEach(function(item, index) {
+		if (item == userId) {
+			podSchedule[index] = 'free';
 		}
-	};
+	});
 }
-
-utils.getCurrentTickets;

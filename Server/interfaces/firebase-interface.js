@@ -12,18 +12,20 @@ firebase.initializeApp(config);
 var database = firebase.database();
 var usersRef = database.ref('users');
 
-/*** --= INTERNAL FUNCTIONS =-- ***/
-// Used interally by interface, not to be called outside of this fuile
+/*** --= INTERNAL FUNCTIONS - DO NOT CALL OUTSIDE OF INTERFACE =-- ***/
+// Used internally by interface, not to be called outside of this file
 
-// Returns a REFERENCE to the currentTicket of a particular user
-// -userId: String of the user's id in Firebase
+/** Returns a REFERENCE to the currentTicket of a particular user
+    -userId: String of the user's id in Firebase
+**/
 function getCurrentTicketFromUser(userId) {
     return usersRef.child(userId).child('currentTicket');
 }
 
-// Returns a snapshot of the reference in firebase; used for querying data
-// -ref: Reference to node in Firebase
-// -callback: Function to call after retrieving the snapshot
+/** Returns a snapshot of the reference in firebase; used for querying data
+    -ref: Reference to node in Firebase
+    -callback: Function to call after retrieving the snapshot
+/**
 function getSnapshot(ref, callback) {
     ref.once('value')
        .then(function(snapshot) {
@@ -31,8 +33,8 @@ function getSnapshot(ref, callback) {
         });
 }
 
-// Parses ticket data into a JSON object, used
-// internally by getAllCurrentTicketTicketsAsJsonArray(..)
+/** Parses ticket data into a JSON object, used internally by getAllCurrentTicketTicketsAsJsonArray(..)
+**/
 function getCurrentTicketJson(userId, onDataReceived) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.once('value')
@@ -57,11 +59,40 @@ function getCurrentTicketJson(userId, onDataReceived) {
 }
 
 
+/*** --= LISTENER FUNCTIONS =-- ***/
+
+
+/** Sets a listener on a particular user's current ticket in Firebase
+    -userId: String of user's id in Firebase
+    -onDataChanged: Callback function that executes every time there is a change in the user's ticket data.
+                    Parameter passed to this function is a 'snapshot' object that represents the ticket
+**/
+exports.setListenerForTicket = function setListenerForTicket(userId, onDataChanged) {
+    var ticketRef = getCurrentTicketFromUser(userId);
+    ticketRef.on('value', onDataChanged);
+}
+
+/** Sets a listener on ALL current ticket in Firebase
+    -onDataChanged: Callback function that executes every time there is a change in a user's ticket data.
+                    Parameter passed to this function is a 'snapshot' object that represents the ticket
+**/
+exports.setListenerForAllCurrentTickets = function setListenerForAllCurrentTickets(onDataChanged) {
+    var usersRef = database.ref('users');
+        usersRef.once('value')
+            .then(function(users) {
+                users.forEach(function(user) {
+                        usersRef.child(user.key).on('value', onDataChanged);
+                });
+            });
+}
+
+
 /*** --= QUERY FUNCTIONS =-- ***/
 
-// Parses the ticket into a JSON object that is returned in a callback function
-// -userId: String of the user's id in Firebase
-// -onDataReceived: callback function which we pass the JSON ticket to
+/** Parses the ticket into a JSON object that is returned in a callback function
+    -userId: String of the user's id in Firebase
+    -onDataReceived: callback function which we pass the JSON ticket to
+**/
 exports.getCurrentTicketJson = function getCurrentTicketJson(userId, onDataReceived) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.once('value')
@@ -84,8 +115,9 @@ exports.getCurrentTicketJson = function getCurrentTicketJson(userId, onDataRecei
             });
 }
 
-// Parses tickets into an array of JSON objects
-// -onRetrieve: the callback function which we will pass the JSON array to
+/** Parses tickets into an array of JSON objects
+    -onRetrieve: the callback function which we will pass the JSON array to
+**/
 exports.getAllCurrentTicketsAsJsonArray = function getAllCurrentTicketsAsJsonArray(onRetrieve) {
     var currentTicketsJsonArray = [];
     usersRef.once('value')
@@ -114,8 +146,9 @@ exports.getAllCurrentTicketsAsJsonArray = function getAllCurrentTicketsAsJsonArr
             });
 }
 
-// Returns a list of Firebase REFERENCES to all current tickets
-// -onReceive: The function to call after retrieving all the tickets
+/** Returns a list of Firebase REFERENCES to all current tickets
+    -onReceive: The function to call after retrieving all the tickets
+**/
 exports.getAllCurrentTicketsRefs = function getAllCurrentTicketsRefs(onRetrieve) {
     var currentTicketReferences = [];
     usersRef.once('value')
@@ -134,35 +167,55 @@ exports.getAllCurrentTicketsRefs = function getAllCurrentTicketsRefs(onRetrieve)
 
 /*** --= STORE FUNCTIONS =-- ***/
 
-// Sets the eta time for a ticket under a particular user
-// -userId: String of user's id in Firebase
-// -time: Integer of time left
+/** Sets the eta time for a ticket under a particular user
+    -userId: String of user's id in Firebase
+	-time: Integer of time left
+**/
 exports.setEta = function setEta(userId, time) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('eta').set(time);
 }
 
-// Sets the timerOn value for a user's current ticket data
-// -userId: String of user's id in Firebase
-// -statusCode: Integer that specifies the status code
+/** Sets the timerOn value for a user's current ticket data
+    -userId: String of user's id in Firebase
+    -statusCode: Integer that specifies the status code
+**/
 exports.setStatus = function setStatus(userId, statusCode) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('status').set(statusCode);
 }
 
-// Sets the timerOn value for a user's current ticket data
-// -userId: String of user's id in Firebase
-// -timerOn: Boolean that specifies of the timer is on or not
+/** Sets the timerOn value for a user's current ticket data
+    -userId: String of user's id in Firebase
+    -timerOn: Boolean that specifies of the timer is on or not
+**/
 exports.setTimerOn = function setTimerOn(userId, timerOn) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('timerOn').set(timerOn);
 }
 
-// Sets the isNewTicket value for a user's current ticket data
-// -userId: String of the user's id in Firebase
-// -isNewTicket: Boolean value that specifies if isNewTicket is true or false
+/** Sets the isNewTicket value for a user's current ticket data
+    -userId: String of the user's id in Firebase
+    -isNewTicket: Boolean value that specifies if isNewTicket is true or false
+**/
 exports.setIsNewTicket = function setIsNewTicket(userId, isNewTicket) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('isNewTicket').set(isNewTicket);
 }
 
+/*** --= LISTENER FUNCTIONS =-- ***/
+// For listening to changes in the database and returning callback
+// function that contain a snapshot of the data
+
+exports.listenForTickets = function listenForTickets(callback) {
+    usersRef.once('value')
+            .then(function(users) {
+                users.forEach(function(user) {
+                    usersRef.child(user.key).on('value', function(snapshot) {
+                        
+                        var userId = snapshot.key;
+                        var firstName = snapshot.child('firstName').val();
+                    })
+                })
+            })
+}
