@@ -6,13 +6,12 @@ var config = {
     databaseURL: "https://spartan-superway.firebaseio.com",
     storageBucket: "spartan-superway.appspot.com",
 };
-// Initialize Firebase with our configuration
 firebase.initializeApp(config);
 // Reference to our database & users
 var database = firebase.database();
 var usersRef = database.ref('users');
 
-/*** --= INTERNAL FUNCTIONS - DO NOT CALL OUTSIDE OF INTERFACE =-- ***/
+/*** --= INTERNAL FUNCTIONS (Do NOT call outside of this interface) =-- ***/
 // Used internally by interface, not to be called outside of this file
 
 /** Returns a REFERENCE to the currentTicket of a particular user
@@ -25,7 +24,7 @@ function getCurrentTicketFromUser(userId) {
 /** Returns a snapshot of the reference in firebase; used for querying data
     -ref: Reference to node in Firebase
     -callback: Function to call after retrieving the snapshot
-/**
+**/
 function getSnapshot(ref, callback) {
     ref.once('value')
        .then(function(snapshot) {
@@ -61,7 +60,6 @@ function getCurrentTicketJson(userId, onDataReceived) {
 
 /*** --= LISTENER FUNCTIONS =-- ***/
 
-
 /** Sets a listener on a particular user's current ticket in Firebase
     -userId: String of user's id in Firebase
     -onDataChanged: Callback function that executes every time there is a change in the user's ticket data.
@@ -85,7 +83,6 @@ exports.setListenerForAllCurrentTickets = function setListenerForAllCurrentTicke
                 });
             });
 }
-
 
 /*** --= QUERY FUNCTIONS =-- ***/
 
@@ -201,21 +198,4 @@ exports.setTimerOn = function setTimerOn(userId, timerOn) {
 exports.setIsNewTicket = function setIsNewTicket(userId, isNewTicket) {
     var ticketRef = getCurrentTicketFromUser(userId);
     ticketRef.child('isNewTicket').set(isNewTicket);
-}
-
-/*** --= LISTENER FUNCTIONS =-- ***/
-// For listening to changes in the database and returning callback
-// function that contain a snapshot of the data
-
-exports.listenForTickets = function listenForTickets(callback) {
-    usersRef.once('value')
-            .then(function(users) {
-                users.forEach(function(user) {
-                    usersRef.child(user.key).on('value', function(snapshot) {
-                        
-                        var userId = snapshot.key;
-                        var firstName = snapshot.child('firstName').val();
-                    })
-                })
-            })
 }
