@@ -120,7 +120,7 @@ class RFID
   public:
     RFID(int chipSelectPin, int NRSTPD);
 	
-	bool isCard();
+	bool isCard(int check);
 	bool readCardSerial();
 	
     void init();
