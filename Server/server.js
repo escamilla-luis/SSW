@@ -77,8 +77,8 @@ function spawnClientThread(podNum, userId, portNum) {
 				dequeueOverflow();
 			} else {
 //				var podNum = message.podNum;
-//				var stationTo = message.stationTo;
-//				port.write(stationTo)
+//				var podMessage = message.podMessage;
+//				port.write(podMessage)
 			}
 		});
 }
