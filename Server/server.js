@@ -62,14 +62,15 @@ function spawnClientThread(podNum, userId, portNum) {
 		})
 		.on('done', function(message) {
 			if (message.killThread) {
+				// Client thread asking to be killed
 				console.log('Killing thread');
-				
 				thread.kill();
 				
 				// Free pod schedule and dequeue users off overflow (if any)
 				podSchedule[message.podNum] = 'free';
 				dequeueOverflow();
 			} else {
+				// Client thread is sending request for something (to run action or obtain information
 //				var podNum = message.podNum;
 //				var podMessage = message.podMessage;
 //				port.write(podMessage)
