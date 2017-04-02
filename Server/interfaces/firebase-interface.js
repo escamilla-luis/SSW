@@ -57,6 +57,10 @@ function getCurrentTicketJson(userId, onDataReceived) {
             });
 }
 
+exports.getUserTicketRef = function getUserTicketRef(userId) {
+    return database.ref('users').child(userId).child('currentTicket');
+}
+
 
 /*** --= LISTENER FUNCTIONS =-- ***/
 

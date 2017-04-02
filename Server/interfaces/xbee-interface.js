@@ -10,7 +10,7 @@ var pathToPort = '/dev/tty.usbserial-DN01J8BJ';
 // Writes a value to an xbee
 // -value: value to write
 // -callback: optional callback if we want to handle data returned by an xbee
-exports.writeToXbee = function writeToXbee(value, callback) {
+function writeToXbee(value, callback) {
 
     // Refresh port every time we call writeToXbee(..)
     var port = new SerialPort(pathToPort, {

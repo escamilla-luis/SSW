@@ -25,14 +25,13 @@ var clientCallback = function (data) {
 };
 
 var speaker = messenger.createSpeaker(8001);
-//spawnClientThread(1, 2, 8001);
+//spawnClientThread(1, "Qvn71YOfXzMdmASoievQBboMEvI3", 8001);
 
 firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		// snapshot = snapshot of ticket
 		var userId = snapshot.key;
 		var firstName = snapshot.child('firstName').val();
 		var lastName = snapshot.child('lastName').val();
-		console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
 
 		// Only assign ticket to client-thread if 'isTicketAlive' == true
 		// Worker threads will fire off listeners as they make changes to the ticket data,
@@ -40,32 +39,27 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
 		if (isNewTicket == true) {
 			console.log('New ticket detected!');
+			console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
 							
 			// Handle new ticket
-			var mutableTicketRef = database.ref('users').child(snapshot.key).child('currentTicket');
-			mutableTicketRef.child('isNewTicket').set(false);
+			var userId = snapshot.key;
+			var ticketRef = firebase.getUserTicketRef(userId);
+			ticketRef.child('isNewTicket').set(false);
 			
 			// Queue pod 
 			fillIfAvailable(userId);
-			
-			// Do something relevant with userId...
-			var mutableEtaRef = mutableTicketRef.child('eta');
-			var mutableStatusRef = mutableTicketRef.child('status');
 		}
 });
-
-//var podNum = 1;
-//setInterval(function() {
-//	console.log('Podschedule: ' + podSchedule);
-//	fillIfAvailable(podNum);
-//	podNum++;
-//}, (Math.random() * 10) + 1000);
 
 function spawnClientThread(podNum, userId, portNum) {
 	console.log('spawning client');
 	var thread = spawn('client.js');
 	thread
-		.send({podNum: podNum, userId: userId, portNum: portNum})
+		.send({
+			podNum: podNum,
+			userId: userId,
+			portNum: portNum
+		})
 		.on('done', function(message) {
 			if (message.killThread) {
 				console.log('Killing thread');
@@ -101,7 +95,7 @@ function fillIfAvailable(userId) {
 
 // Searches for an available pod and add a user to the schedule
 function addUserToPodSchedule(userId) {
-	
+	console.log('addUserToPodSchedule()');
 	podSchedule.every(function(item, index) {
 		if (item == 'free') {
 			podSchedule[index] = userId;
