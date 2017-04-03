@@ -25,6 +25,10 @@ var clientCallback = function (data) {
 };
 
 var speaker = messenger.createSpeaker(8001);
+setInterval(function() {
+	speaker.request('messageFromPod', 'arrivedAtPickup');
+}, 2000);
+
 //spawnClientThread(1, "Qvn71YOfXzMdmASoievQBboMEvI3", 8001);
 
 firebase.setListenerForAllCurrentTickets(function(snapshot) {
@@ -71,9 +75,10 @@ function spawnClientThread(podNum, userId, portNum) {
 				dequeueOverflow();
 			} else {
 				// Client thread is sending request for something (to run action or obtain information
-//				var podNum = message.podNum;
-//				var podMessage = message.podMessage;
-//				port.write(podMessage)
+				var podNum = message.podNum;
+				var podMessage = message.podMessage;
+				console.log('podNum: ' + podNum + ' has sent message: ' + podMessage);
+//				xbee.write(podMessage);
 			}
 		});
 }

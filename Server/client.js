@@ -102,7 +102,7 @@ module.exports = function(input, done) {
         });
         
         // Listen for Communication from Pod routed through Server's speaker
-        listener.on('messageFromPod', function(message,data) {
+        listener.on('messageFromPod', function(message, data) {
             var stationTo = ticket.to;
             console.log('Message From Server');
             var message = data.message;
@@ -112,13 +112,13 @@ module.exports = function(input, done) {
     //			Will have to process based on format it is sent.
             
             switch(message) {
-                case "arrivedAtPickup":	 //Pod arrived at Pickup
+                case 'arrivedAtPickup':	 //Pod arrived at Pickup
                     //Update status code: user must enter pod
-                    updateStatusInDatabases(userId, podNum, 200);
+//                    updateStatusInDatabases(userId, podNum, 200);
                     break;
-                case "arrivedAtDestination":  //Pod arrived at Dropoff
+                case 'arrivedAtDestination':  //Pod arrived at Dropoff
                     //Update status code: user must disembark
-                    updateStatusInDatabases(userId, podNum, 400);
+//                    updateStatusInDatabases(userId, podNum, 400);
                     break;
                 default:
                     message.reply("Communication halted");
@@ -145,7 +145,7 @@ function messageFormatter(podNum, action, input1, input2) {
     var sPodNum = podNum < 10 ? "0" + podNum : podNum.toString();
     var sInput1 = input1 < 10 ? '0' + input1 : input1.toString();
     var sInput2 = input2 < 10 ? '0' +input1 : input2.toString();
-    return sPodNum + action + input1 + input2;
+    return sPodNum + action + sInput1 + sInput2;
 }
 
 // Overload function to support single inputs - ie. setAction for LED
