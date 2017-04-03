@@ -10,18 +10,18 @@ firebase.initializeApp(config);
 var database = firebase.database();
 var usersRef = database.ref('users');
 
-// Test file used to push data to Firebase
-usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
-        .child('currentTicket')
-        .child('from')
-        .set(13);
-        
-usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
-        .child('currentTicket')
-        .child('isNewTicket')
-        .set(true);
+//// Test file used to push data to Firebase
+//usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
+//        .child('currentTicket')
+//        .child('from')
+//        .set(13);
+//        
+//usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
+//        .child('currentTicket')
+//        .child('isNewTicket')
+//        .set(true);
         
 usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
         .child('currentTicket')
         .child('status')
-        .set(300);
+        .set(900);

@@ -50,40 +50,51 @@ module.exports = function(input, done) {
         // Sets a listener on the ticket for status changing
         firebase.setListenerForTicket(userId, function(ticketSnapshot) {
             var status = ticketSnapshot.child('status').val();
+            var from = ticketSnapshot.child('from').val()
+            console.log('from: ' + from);
 
             switch (status) {
                 case 100:
+                    console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
                     podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, 1, ticket.from);
                     done({podNum: podNum, podMessage: podMessage});
-                    updateStatusInDatabases(userId, podNum, 100);
+                    updateStatusInDatabases(userId, podNum, 200);
+                    break;
                 case 200:
+                    console.log('status: ' + 200);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's starting location, waiting for user to get inside
                     podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
                     done({podNum: podNum, podMessage: podMessage});
-                    updateStatusInDatabases(userId, podNum, 200);
+//                    updateStatusInDatabases(userId, podNum, 200); // We should not update Firebase for this status from server
+                    break;
                 case 300: 
+                    console.log('status: ' + 300);
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
                     podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, ticket.from, ticket.to);
                     done({podNum: podNum, podMessage: podMessage});	// Send server message to relay to pod
-                    updateStatusInDatabases(userId, podNum, 300);
+                    updateStatusInDatabases(userId, podNum, 400);
+                    break;
                 case 400:
+                    console.log('status: ' + 400);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
-                    // Pod arrived at user's starting location, waiting for user to get inside
+                    // Pod arrived at user's destination, waiting for user to exit
                     podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.RED_FLASHING);
                     done({podNum: podNum, podMessage: podMessage});
-                    updateStatusInDatabases(userId, podNum, 400);
+//                    updateStatusInDatabases(userId, podNum, 400); // We should not update Firebase for this status from server
+                    break;
                 case 900: 
+                    console.log('status: ' + 900);
                     // User just exited the pod; ride over; (switched from 500)
                     // Tell pod to finish
                     podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.RED);
                     done({podNum: podNum, podMessage: podMessage});
                     updateStatusInDatabases(userId, podNum, 900); 
                     done({podNum: podNum, killThread: true});	// Thread tells server to kill it. 
-    
+                    break;
                 default:
                     break;
             }
@@ -124,7 +135,7 @@ function userDeparted() {
 //Updates both firebase and mySQL status columns when called
 function updateStatusInDatabases(userId, podNum, status) {
     firebase.setStatus(userId, status);
-//    mysql.setStatus(status, podNum);
+//    mysql.setStatus(status, podNum); // FIXME: MySQL interface needs to be tested
 }
 
 // Formats data for message to communication according to protocol in google drive doc
