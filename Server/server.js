@@ -25,8 +25,12 @@ var clientCallback = function (data) {
 };
 
 var speaker = messenger.createSpeaker(8001);
+var onReplyCallback = function(replyData) {
+	console.log('onReplyCallback');
+	console.log(replyData.message);
+}
 setInterval(function() {
-	speaker.request('messageFromPod', 'arrivedAtPickup');
+	speaker.request('messageFromPod', {podMessage: 'arrivedAtPickup'}, onReplyCallback);
 }, 2000);
 
 //spawnClientThread(1, "Qvn71YOfXzMdmASoievQBboMEvI3", 8001);
@@ -105,7 +109,7 @@ function addUserToPodSchedule(userId) {
 	podSchedule.every(function(item, index) {
 		if (item == 'free') {
 			podSchedule[index] = userId;
-			spawnClientThread(index, userId, 8000 + index);
+			spawnClientThread(index, userId, 8001 + index);
 			return false;  // Break out of loop
 		}
 		return true; 		// Continue loop

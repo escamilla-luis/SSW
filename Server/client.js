@@ -29,6 +29,7 @@ module.exports = function(input, done) {
     var podNum = input.podNum;
     var userId = input.userId;
     var portNum = input.portNum;
+    console.log('portNum: ' + portNum);
     var status =- 1;
     
         
@@ -40,7 +41,8 @@ module.exports = function(input, done) {
     firebase.getCurrentTicketJson(userId, function(data) {
         // Variables will need throughout the thread.
         var ticket = data;
-        var podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, ticket.from, ticket.to);
+        var input = formatLocationInput(ticket.from, ticket.to);
+        var podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, input);
         console.log('podMessage: ' + podMessage);
 
         // Tell pod to go to pickup user
@@ -58,7 +60,8 @@ module.exports = function(input, done) {
                     console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
-                    podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, 1, ticket.from);
+                    var input = formatLocationInput(1, ticket.from);
+                    podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, input);
                     done({podNum: podNum, podMessage: podMessage});
                     updateStatusInDatabases(userId, podNum, 200);
                     break;
@@ -68,13 +71,15 @@ module.exports = function(input, done) {
                     // Pod arrived at user's starting location, waiting for user to get inside
                     podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
                     done({podNum: podNum, podMessage: podMessage});
-//                    updateStatusInDatabases(userId, podNum, 200); // We should not update Firebase for this status from server
+                    // We should not have to update Firebase for this status from server
+//                    updateStatusInDatabases(userId, podNum, 200); 
                     break;
                 case 300: 
                     console.log('status: ' + 300);
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
-                    podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, ticket.from, ticket.to);
+                    var input = formatLocationInput(ticket.from, ticket.to);
+                    podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, input);
                     done({podNum: podNum, podMessage: podMessage});	// Send server message to relay to pod
                     updateStatusInDatabases(userId, podNum, 400);
                     break;
@@ -102,28 +107,31 @@ module.exports = function(input, done) {
         });
         
         // Listen for Communication from Pod routed through Server's speaker
+        // message = the message OBJECT
+        // data = the json object passed from server
         listener.on('messageFromPod', function(message, data) {
+            
+            // TODO: Filter data so that podMessage corresponds to the right client #
             var stationTo = ticket.to;
             console.log('Message From Server');
-            var message = data.message;
-            //Process message to figure out what XBEE sent
+            console.log('podMessage: ' + data.podMessage);
             
-    //-----> I dont know how the xbee is sending data back right now.
-    //			Will have to process based on format it is sent.
-            
-            switch(message) {
+            // Process message to figure out what XBEE sent
+            switch(data.podMessage) {
                 case 'arrivedAtPickup':	 //Pod arrived at Pickup
+                    console.log('switch - arrivedAtPickup');
                     //Update status code: user must enter pod
 //                    updateStatusInDatabases(userId, podNum, 200);
                     break;
                 case 'arrivedAtDestination':  //Pod arrived at Dropoff
+                    console.log('switch - arrivedAtDestination');
                     //Update status code: user must disembark
 //                    updateStatusInDatabases(userId, podNum, 400);
                     break;
                 default:
-                    message.reply("Communication halted");
+                    message.reply("Unrecognized message");
             }
-            message.reply(podNum + 'Received Message');
+            message.reply({message: podNum + ': Received Message'});
         });    
     });
 };
@@ -138,18 +146,15 @@ function updateStatusInDatabases(userId, podNum, status) {
 //    mysql.setStatus(status, podNum); // FIXME: MySQL interface needs to be tested
 }
 
-// Formats data for message to communication according to protocol in google drive doc
-// The format should follow a 8-digit number
-function messageFormatter(podNum, action, input1, input2) {
-    //Format data for communication.
-    var sPodNum = podNum < 10 ? "0" + podNum : podNum.toString();
-    var sInput1 = input1 < 10 ? '0' + input1 : input1.toString();
-    var sInput2 = input2 < 10 ? '0' +input1 : input2.toString();
-    return sPodNum + action + sInput1 + sInput2;
+function formatLocationInput(from, to) {
+    var sFrom = from < 10 ? '0' + from : from;
+    var sTo = to < 10 ? '0' + to : to;
+    return sFrom + '' + sTo;
 }
 
-// Overload function to support single inputs - ie. setAction for LED
+// Formats data for message to communication according to protocol in google drive doc
+// The format should follow a 8-digit number
 function messageFormatter(podNum, action, input) {
-    var sPodNum = podNum < 10 ? "0" + podNum : podNum.toString();
-    return sPodNum + action + input.toString();
+    var sPodNum = podNum < 10 ? "0" + podNum : podNum;
+    return sPodNum + action + input;
 }
