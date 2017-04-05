@@ -46,16 +46,21 @@ module.exports = function(input, done) {
         // Variables will need throughout the thread.
         var ticket = data;
         var input = formatLocationInput(ticket.from, ticket.to);
-
+        var currentStatus = 0;
+        
         // Sets a listener on the ticket for status changing
         firebase.setListenerForTicket(userId, function(ticketSnapshot) {
             var status = ticketSnapshot.child('status').val();
             var from = 1; // Assume starting @ station 1
             var to = ticketSnapshot.child('to').val();
-            
 
             switch (status) {
                 case 100:
+                    if (currentStatus == status) {
+                        return;
+                    } 
+                    currentStatus = status;
+                    
                     console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
@@ -67,9 +72,25 @@ module.exports = function(input, done) {
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
                     sendXbeeCommand(podCommand);
                     
+                    var eta = 10;
+                    var timer = setInterval(function() {
+                        firebase.setEta(userId, eta);
+                        eta = eta - 1;
+                        
+                        if (eta < 0) {
+                            firebase.setStatus(userId, 200);
+                            clearInterval(timer);
+                        }
+                    }, 1000);
+                                        
 //                    updateStatusInDatabases(userId, podNum, 200);
                     break;
                 case 200:
+                    if (currentStatus == status) {
+                        return;
+                    } 
+                    currentStatus = status;
+                    
                     console.log('status: ' + 200);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's starting location, waiting for user to get inside
@@ -79,12 +100,28 @@ module.exports = function(input, done) {
 //                    updateStatusInDatabases(userId, podNum, 200); 
                     break;
                 case 300: 
+                    if (currentStatus == status) {
+                        return;
+                    } 
+                    currentStatus = status;
+                    
                     console.log('status: ' + 300);
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
-                    var input = formatLocationInput(ticket.from, ticket.to);
-                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+//                    var input = formatLocationInput(ticket.from, ticket.to);
+//                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
 //                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
+                    
+                    var eta = 10;
+                    var timer = setInterval(function() {
+                        firebase.setEta(userId, eta);
+                        eta = eta - 1;
+                        
+                        if (eta < 0) {
+                            firebase.setStatus(userId, 400);
+                            clearInterval(timer);
+                        }
+                    }, 1000);
                     
                     // Set LED on pod                    
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
@@ -93,6 +130,11 @@ module.exports = function(input, done) {
 //                    updateStatusInDatabases(userId, podNum, 400);
                     break;
                 case 400:
+                    if (currentStatus == status) {
+                        return;
+                    } 
+                    currentStatus = status;
+                    
                     console.log('status: ' + 400);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's destination, waiting for user to exit
@@ -101,6 +143,11 @@ module.exports = function(input, done) {
 //                    updateStatusInDatabases(userId, podNum, 400); // We should not update Firebase for this status from server
                     break;
                 case 900: 
+                    if (currentStatus == status) {
+                        return;
+                    } 
+                    currentStatus = status;
+                    
                     console.log('status: ' + 900);
                     // User just exited the pod; ride over; (switched from 500)
                     // Tell pod to finish
