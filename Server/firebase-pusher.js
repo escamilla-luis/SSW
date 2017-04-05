@@ -30,4 +30,5 @@ var userId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
 usersRef.child(userId)
         .child('currentTicket')
         .child('status')
-        .set(100);
+        .set(400);
+    

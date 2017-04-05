@@ -30,7 +30,8 @@ var ledState = {             // Status code
 
 
 module.exports = function(input, done) {
-    var podNum = input.podNum;
+//    var podNum = input.podNum + 1;
+    var podNum = 2;
     var userId = input.userId;
     var portNum = input.portNum;
     console.log('portNum: ' + portNum);
@@ -49,8 +50,8 @@ module.exports = function(input, done) {
         console.log('podCommand: ' + podCommand);
 
         // Tell pod to go to pickup user
-        done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
-        updateStatusInDatabases(userId, podNum, 100);
+//        done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
+//        updateStatusInDatabases(userId, podNum, 100);
     
         // Sets a listener on the ticket for status changing
         firebase.setListenerForTicket(userId, function(ticketSnapshot) {
@@ -65,19 +66,19 @@ module.exports = function(input, done) {
                     // Tells pod to go to user's starting location
                     var input = formatLocationInput(1, ticket.from);
                     podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-                    sendXbeeCommand(podCommand);
+//                    sendXbeeCommand(podCommand);
                     
                     // Set LED on pod
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
                     sendXbeeCommand(podCommand);
                     
-                    updateStatusInDatabases(userId, podNum, 200);
+//                    updateStatusInDatabases(userId, podNum, 200);
                     break;
                 case 200:
                     console.log('status: ' + 200);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's starting location, waiting for user to get inside
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASH);
                     sendXbeeCommand(podCommand);
                     // We should not have to update Firebase for this status from server
 //                    updateStatusInDatabases(userId, podNum, 200); 
@@ -88,13 +89,13 @@ module.exports = function(input, done) {
                     // Tell pod to go to destination
                     var input = formatLocationInput(ticket.from, ticket.to);
                     podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
+//                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
                     
                     // Set LED on pod                    
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
                     sendXbeeCommand(podCommand);
 
-                    updateStatusInDatabases(userId, podNum, 400);
+//                    updateStatusInDatabases(userId, podNum, 400);
                     break;
                 case 400:
                     console.log('status: ' + 400);
@@ -111,7 +112,7 @@ module.exports = function(input, done) {
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.YELLOW);
                     sendXbeeCommand(podCommand);
                     
-                    updateStatusInDatabases(userId, podNum, 900); 
+//                    updateStatusInDatabases(userId, podNum, 900); 
                     done({podNum: podNum, killThread: true});	// Thread tells server to kill it. 
                     break;
                 default:

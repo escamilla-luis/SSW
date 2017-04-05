@@ -163,8 +163,8 @@ function spawnClientThread(podNum, userId, portNum) {
 				// Client thread is sending request for something (to run action or obtain information
 				var podNum = message.podNum;
 				var podCommand = message.podCommand;
-				console.log('client for podNum ' + podNum + ' has sent message: ' + podCommand);
-				xbee.write(podCommand);
+				console.log('client for podNum ' + podNum + ' has sent command: ' + podCommand);
+				port.write(podCommand);
 			}
 		});
 }
