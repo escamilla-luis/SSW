@@ -12,23 +12,23 @@ var usersRef = database.ref('users');
 var userId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
 
 // Test file used to push data to Firebase
-//usersRef.child(userId)
-//        .child('currentTicket')
-//        .child('from')
-//        .set(1);
-//
-//usersRef.child(userId)
-//        .child('currentTicket')
-//        .child('to')
-//        .set(3);
-//                    
-//usersRef.child(userId)
-//        .child('currentTicket')
-//        .child('isNewTicket')
-//        .set(true);
+usersRef.child(userId)
+        .child('currentTicket')
+        .child('from')
+        .set(1);
+
+usersRef.child(userId)
+        .child('currentTicket')
+        .child('to')
+        .set(3);
+                    
+usersRef.child(userId)
+        .child('currentTicket')
+        .child('isNewTicket')
+        .set(true);
         
 usersRef.child(userId)
         .child('currentTicket')
         .child('status')
-        .set(400);
+        .set(100);
     

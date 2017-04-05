@@ -46,26 +46,21 @@ module.exports = function(input, done) {
         // Variables will need throughout the thread.
         var ticket = data;
         var input = formatLocationInput(ticket.from, ticket.to);
-        var podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-        console.log('podCommand: ' + podCommand);
 
-        // Tell pod to go to pickup user
-//        done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
-//        updateStatusInDatabases(userId, podNum, 100);
-    
         // Sets a listener on the ticket for status changing
         firebase.setListenerForTicket(userId, function(ticketSnapshot) {
             var status = ticketSnapshot.child('status').val();
-            var from = ticketSnapshot.child('from').val()
-            console.log('from: ' + from);
+            var from = 1; // Assume starting @ station 1
+            var to = ticketSnapshot.child('to').val();
+            
 
             switch (status) {
                 case 100:
                     console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
-                    var input = formatLocationInput(1, ticket.from);
-                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+//                    var input = formatLocationInput(from, to);
+//                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
 //                    sendXbeeCommand(podCommand);
                     
                     // Set LED on pod
