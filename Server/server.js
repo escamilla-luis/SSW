@@ -75,6 +75,7 @@ function processStream() {
 	console.log('Action Id: ' + actionId);
 	console.log('Action Info: ' + actionInfo);
 	
+	// Clear stream
 	stream = '';
 }
 
@@ -161,9 +162,9 @@ function spawnClientThread(podNum, userId, portNum) {
 			} else {
 				// Client thread is sending request for something (to run action or obtain information
 				var podNum = message.podNum;
-				var podMessage = message.podMessage;
-				console.log('podNum: ' + podNum + ' has sent message: ' + podMessage);
-//				xbee.write(podMessage);
+				var podCommand = message.podCommand;
+				console.log('client for podNum ' + podNum + ' has sent message: ' + podCommand);
+				xbee.write(podCommand);
 			}
 		});
 }

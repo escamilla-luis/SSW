@@ -15,17 +15,17 @@ var podAction = {
     SET_NEXT_STATION: '08'
 }
 
-var ledState = {
-    RED:          '0001',     // At station/checkpoint
+var ledState = {             // Status code
+    RED:          '0001',    // At station/checkpoint
     RED_FLASH:    '0002',    // Kill state
-    BLUE:         '0002',             // Read magnet, station, or checkoint
-    BLUE_FLASH:   '0005',    // 
-    GREEN:        '0003',            // *Idle
-    GREEN_FLASH:  '0006'    // 
-    PURPLE:       '0007'
-    PURPLE_FLASH: '0008'
-    YELLOW:       '0009'
-    YELLOW_FLASH: '0010'
+    BLUE:         '0003',    // Read magnet, station, or checkoint
+    BLUE_FLASH:   '0004',    // 
+    GREEN:        '0005',    // 100, 300
+    GREEN_FLASH:  '0006',    // 200
+    PURPLE:       '0007',    // 
+    PURPLE_FLASH: '0008',    // 
+    YELLOW:       '0009',    // 900
+    YELLOW_FLASH: '0010',    // 400
 }
 
 
@@ -36,7 +36,6 @@ module.exports = function(input, done) {
     console.log('portNum: ' + portNum);
     var status =- 1;
     
-        
     //Creates Listener for server communication
     var listener = messenger.createListener(portNum);
     
@@ -46,11 +45,11 @@ module.exports = function(input, done) {
         // Variables will need throughout the thread.
         var ticket = data;
         var input = formatLocationInput(ticket.from, ticket.to);
-        var podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-        console.log('podMessage: ' + podMessage);
+        var podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+        console.log('podCommand: ' + podCommand);
 
         // Tell pod to go to pickup user
-        done({podNum: podNum, podMessage: podMessage});	// Send server message to relay to pod
+        done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
         updateStatusInDatabases(userId, podNum, 100);
     
         // Sets a listener on the ticket for status changing
@@ -65,16 +64,21 @@ module.exports = function(input, done) {
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
                     var input = formatLocationInput(1, ticket.from);
-                    podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-                    done({podNum: podNum, podMessage: podMessage});
+                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+                    sendXbeeCommand(podCommand);
+                    
+                    // Set LED on pod
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
+                    sendXbeeCommand(podCommand);
+                    
                     updateStatusInDatabases(userId, podNum, 200);
                     break;
                 case 200:
                     console.log('status: ' + 200);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's starting location, waiting for user to get inside
-                    podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
-                    done({podNum: podNum, podMessage: podMessage});
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
+                    sendXbeeCommand(podCommand);
                     // We should not have to update Firebase for this status from server
 //                    updateStatusInDatabases(userId, podNum, 200); 
                     break;
@@ -83,24 +87,30 @@ module.exports = function(input, done) {
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
                     var input = formatLocationInput(ticket.from, ticket.to);
-                    podMessage = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-                    done({podNum: podNum, podMessage: podMessage});	// Send server message to relay to pod
+                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
+                    
+                    // Set LED on pod                    
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASHING);
+                    sendXbeeCommand(podCommand);
+
                     updateStatusInDatabases(userId, podNum, 400);
                     break;
                 case 400:
                     console.log('status: ' + 400);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's destination, waiting for user to exit
-                    podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.RED_FLASHING);
-                    done({podNum: podNum, podMessage: podMessage});
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.YELLOW_FLASH);
+                    sendXbeeCommand(podCommand);
 //                    updateStatusInDatabases(userId, podNum, 400); // We should not update Firebase for this status from server
                     break;
                 case 900: 
                     console.log('status: ' + 900);
                     // User just exited the pod; ride over; (switched from 500)
                     // Tell pod to finish
-                    podMessage = messageFormatter(podNum, podAction.SET_STATE, ledState.RED);
-                    done({podNum: podNum, podMessage: podMessage});
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.YELLOW);
+                    sendXbeeCommand(podCommand);
+                    
                     updateStatusInDatabases(userId, podNum, 900); 
                     done({podNum: podNum, killThread: true});	// Thread tells server to kill it. 
                     break;
@@ -114,13 +124,13 @@ module.exports = function(input, done) {
         // data = the json object passed from server
         listener.on('messageFromPod', function(message, data) {
             
-            // TODO: Filter data so that podMessage corresponds to the right client #
+            // TODO: Filter data so that podCommand corresponds to the right client #
             var stationTo = ticket.to;
             console.log('Message From Server');
-            console.log('podMessage: ' + data.podMessage);
+            console.log('podCommand: ' + data.podCommand);
             
             // Process message to figure out what XBEE sent
-            switch(data.podMessage) {
+            switch(data.podCommand) {
                 case 'arrivedAtPickup':	 //Pod arrived at Pickup
                     console.log('switch - arrivedAtPickup');
                     //Update status code: user must enter pod
@@ -137,7 +147,13 @@ module.exports = function(input, done) {
             message.reply({message: podNum + ': Received Message'});
         });    
     });
+    
+    
+    function sendXbeeCommand(podCommand) {
+        done({podNum: podNum, podCommand: podCommand});
+    }
 };
+
 
 function userDeparted() {
     done({podNum: podNum, killThread: true});
