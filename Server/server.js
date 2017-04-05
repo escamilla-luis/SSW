@@ -2,15 +2,96 @@ var messenger = require('messenger');
 var mysql = require('mysql');
 var firebase = require('./interfaces/firebase-interface.js');
 var mysqlEvents = require('mysql-events');
-var xbee = require('./interfaces/xbee-interface.js');
+//var xbee = require('./interfaces/xbee-interface.js');
 var SerialPort = require('serialport');
 var threads = require('threads');
-// Put config and spawn AFTER threads
+// Put 'config' and 'spawn' AFTER 'threads' module
 var config = threads.config;
 var spawn = threads.spawn;
 
+/** -== Xbee code ==- **/
+// Path to serialport may be different on other machines
+var pathToPort = '/dev/tty.usbserial-DN01J8BJ';
+var databuffer = [];
+var stream = '';
 
-// Server/Client code
+// Refresh port every time we call writeToXbee(..)
+var port = new SerialPort(pathToPort, {
+	autoOpen: false,
+	baudrate: 57600
+});
+
+// Set listener for port opening. We write to the xbee in callback.
+port.on('open', function() {
+	port.on('data', function (dataFromXbee) {
+		// dataFromXbee is a Buffer data type
+		var stringData = dataFromXbee.toString('utf8');
+		console.log('Data from xbee: ' + stringData);
+		queueBuffer(stringData);
+	});
+});
+
+// We open the port, which will fire off our .on('open') callback functiondatabuffer that writes to the xbee.
+port.open(function (err) {
+	if (err) {
+		console.log('Error opening port: ', err.message);
+	} else {
+		console.log('Port opened');
+	}
+});
+
+function queueBuffer(input) {
+	console.log(input);
+	for (var i = 0; i < input.length; i++) {databuffer
+		databuffer.push(input[i]);
+	}
+	
+	addToStream();
+}
+
+function addToStream(){	
+	// Dequeue buffer to go to stream
+	while (databuffer.length > 0 && databuffer[0] != 'e') {
+		stream += databuffer.shift();
+	}
+	
+	if (databuffer.length > 0) {
+		if (databuffer[0] == 'e') {
+			databuffer.shift();
+			processStream();
+		}
+	}
+}
+
+function processStream() {
+	// 'stream' is expected to be a complete 8-char string here
+	console.log('Stream: ' + stream);
+	
+	var podNum = getPodNumber(stream);
+	var actionId = getActionId(stream);
+	var actionInfo = getActionInfo(stream);
+	
+	console.log('Pod #: ' + podNum);
+	console.log('Action Id: ' + actionId);
+	console.log('Action Info: ' + actionInfo);
+	
+	stream = '';
+}
+
+function getPodNumber(streamData) {
+	return streamData.charAt(0) + streamData.charAt(1);
+}
+
+function getActionId(streamData) {
+	return streamData.charAt(2) + streamData.charAt(3);
+}
+
+function getActionInfo(streamData) {
+	return streamData.charAt(4) + streamData.charAt(5) + streamData.charAt(6) + streamData.charAt(7);
+}
+
+
+/** -== Server/Client code ==- **/
 var podSchedule = ['free', 'free', 'free', 'free'];
 var overflowQueue = []; // .push() to enqueue, .shift() to dequeue
 
@@ -29,9 +110,9 @@ var onReplyCallback = function(replyData) {
 	console.log('onReplyCallback');
 	console.log(replyData.message);
 }
-setInterval(function() {
-	speaker.request('messageFromPod', {podMessage: 'arrivedAtPickup'}, onReplyCallback);
-}, 2000);
+//setInterval(function() {
+//	speaker.request('messageFromPod', {podMessage: 'arrivedAtPickup'}, onReplyCallback);
+//}, 2000);
 
 //spawnClientThread(1, "Qvn71YOfXzMdmASoievQBboMEvI3", 8001);
 

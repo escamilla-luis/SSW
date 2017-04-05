@@ -16,12 +16,16 @@ var podAction = {
 }
 
 var ledState = {
-    RED: '0001',
-    BLUE: '0002',
-    GREEN: '0003',
-    RED_FLASHING: '0004',
-    BLUE_FLASHING: '0005',
-    GREEN_FLASHING: '0006'
+    RED:          '0001',     // At station/checkpoint
+    RED_FLASH:    '0002',    // Kill state
+    BLUE:         '0002',             // Read magnet, station, or checkoint
+    BLUE_FLASH:   '0005',    // 
+    GREEN:        '0003',            // *Idle
+    GREEN_FLASH:  '0006'    // 
+    PURPLE:       '0007'
+    PURPLE_FLASH: '0008'
+    YELLOW:       '0009'
+    YELLOW_FLASH: '0010'
 }
 
 
@@ -103,7 +107,6 @@ module.exports = function(input, done) {
                 default:
                     break;
             }
-            
         });
         
         // Listen for Communication from Pod routed through Server's speaker
@@ -143,7 +146,7 @@ function userDeparted() {
 //Updates both firebase and mySQL status columns when called
 function updateStatusInDatabases(userId, podNum, status) {
     firebase.setStatus(userId, status);
-//    mysql.setStatus(status, podNum); // FIXME: MySQL interface needs to be tested
+    mysql.setStatus(status, podNum); // FIXME: MySQL interface needs to be tested
 }
 
 function formatLocationInput(from, to) {

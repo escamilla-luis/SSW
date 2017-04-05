@@ -1,8 +1,5 @@
 var util = require('util');
 var SerialPort = require('serialport');
-var xbee_api = require('xbee-api');
-var C = xbee_api.constants;
-
 
 // Path to serialport may be different on different machines
 var pathToPort = '/dev/tty.usbserial-DN01J8BJ';

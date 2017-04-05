@@ -14,8 +14,13 @@ var usersRef = database.ref('users');
 usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
         .child('currentTicket')
         .child('from')
-        .set(13);
-        
+        .set(1);
+
+usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
+        .child('currentTicket')
+        .child('to')
+        .set(3);
+                    
 usersRef.child('Qvn71YOfXzMdmASoievQBboMEvI3')
         .child('currentTicket')
         .child('isNewTicket')
