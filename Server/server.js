@@ -127,6 +127,9 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 			console.log('New ticket detected!');
 			console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
 			
+//			var startingStation = snapshot.child('currentTicket').child('from').val();
+//			port.write('0009000' + startingStation);
+			
 			// Handle new ticket
 			var userId = snapshot.key;
 			var ticketRef = firebase.getUserTicketRef(userId);

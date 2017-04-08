@@ -52,7 +52,7 @@ module.exports = function(input, done) {
         // Sets a listener on the ticket for status changing
         firebase.setListenerForTicket(userId, function(ticketSnapshot) {
             var status = ticketSnapshot.child('status').val();
-            var from = 1; // Assume starting @ station 1
+            var from = ticketSnapshot.child('from').val();
             var to = ticketSnapshot.child('to').val();
 
             switch (status) {
@@ -65,24 +65,24 @@ module.exports = function(input, done) {
                     console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
-//                    var input = formatLocationInput(from, to);
-//                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-//                    sendXbeeCommand(podCommand);
+                    var input = formatLocationInput(from, to);
+                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+                    sendXbeeCommand(podCommand);
                     
                     // Set LED on pod
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
                     sendXbeeCommand(podCommand);
                     
-                    var eta = 10;
-                    var timer = setInterval(function() {
-                        firebase.setEta(userId, eta);
-                        eta = eta - 1;
-                        
-                        if (eta < 0) {
-                            firebase.setStatus(userId, 200);
-                            clearInterval(timer);
-                        }
-                    }, 1000);
+//                    var eta = 10;
+//                    var timer = setInterval(function() {
+//                        firebase.setEta(userId, eta);
+//                        eta = eta - 1;
+//                        
+//                        if (eta < 0) {
+//                            firebase.setStatus(userId, 200);
+//                            clearInterval(timer);
+//                        }
+//                    }, 1000);
                                         
 //                    updateStatusInDatabases(userId, podNum, 200);
                     break;
@@ -109,20 +109,19 @@ module.exports = function(input, done) {
                     console.log('status: ' + 300);
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
-//                    var input = formatLocationInput(ticket.from, ticket.to);
-//                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-//                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
+                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0400'); // Continue pod
+                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
                     
-                    var eta = 10;
-                    var timer = setInterval(function() {
-                        firebase.setEta(userId, eta);
-                        eta = eta - 1;
-                        
-                        if (eta < 0) {
-                            firebase.setStatus(userId, 400);
-                            clearInterval(timer);
-                        }
-                    }, 1000);
+//                    var eta = 10;
+//                    var timer = setInterval(function() {
+//                        firebase.setEta(userId, eta);
+//                        eta = eta - 1;
+//                        
+//                        if (eta < 0) {
+//                            firebase.setStatus(userId, 400);
+//                            clearInterval(timer);
+//                        }
+//                    }, 1000);
                     
                     // Set LED on pod                    
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
