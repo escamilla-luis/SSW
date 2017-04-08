@@ -9,7 +9,7 @@ firebase.initializeApp(config);
 
 var database = firebase.database();
 var usersRef = database.ref('users');
-var userId = 'foU7qleWVFd7Xhtk5wjrfzBWQnX2';
+var userId = 'Qvn71YOfXzMdmASoievQBboMEvI3';
 
 // Test file used to push data to Firebase
 usersRef.child(userId)
@@ -30,5 +30,5 @@ usersRef.child(userId)
 usersRef.child(userId)
         .child('currentTicket')
         .child('status')
-        .set(200);
+        .set(900);
     

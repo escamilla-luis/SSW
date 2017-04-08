@@ -70,13 +70,14 @@ function processStream() {
 	var podNum = getPodNumber(stream);
 	var actionId = getActionId(stream);
 	var actionInfo = getActionInfo(stream);
+	stream = ''; // Clear stream
 	
 	console.log('Pod #: ' + podNum);
 	console.log('Action Id: ' + actionId);
 	console.log('Action Info: ' + actionInfo);
 	
-	// Clear stream
-	stream = '';
+//	var podMessage = podNum + actionId + actionInfo
+//	speaker.request('messageFromPod', {podMessage: podMessage}, onReplyCallback);
 }
 
 function getPodNumber(streamData) {
@@ -91,6 +92,12 @@ function getActionInfo(streamData) {
 	return streamData.charAt(4) + streamData.charAt(5) + streamData.charAt(6) + streamData.charAt(7);
 }
 
+/** -== Node.js messenger API ==- **/
+var speaker = messenger.createSpeaker(8001);
+var onReplyCallback = function(replyData) {
+	console.log('onReplyCallback');
+	console.log(replyData.message);
+}
 
 /** -== Server/Client code ==- **/
 var podSchedule = ['free', 'free', 'free', 'free'];
@@ -106,17 +113,6 @@ var clientCallback = function (data) {
 	podSchedule[data.podNumber] = data.podStatus;
 };
 
-var speaker = messenger.createSpeaker(8001);
-var onReplyCallback = function(replyData) {
-	console.log('onReplyCallback');
-	console.log(replyData.message);
-}
-//setInterval(function() {
-//	speaker.request('messageFromPod', {podMessage: 'arrivedAtPickup'}, onReplyCallback);
-//}, 2000);
-
-//spawnClientThread(1, "Qvn71YOfXzMdmASoievQBboMEvI3", 8001);
-
 firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		// snapshot = snapshot of ticket
 		var userId = snapshot.key;
@@ -130,7 +126,7 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		if (isNewTicket == true) {
 			console.log('New ticket detected!');
 			console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
-							
+			
 			// Handle new ticket
 			var userId = snapshot.key;
 			var ticketRef = firebase.getUserTicketRef(userId);

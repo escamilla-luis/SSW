@@ -12,7 +12,8 @@ var podAction = {
     GET_SPEED: '05',
     SET_DESTINATION: '06',
     GET_LOCATION: '07',
-    SET_NEXT_STATION: '08'
+    SET_NEXT_STATION: '08',
+    CLOSEST_TO_STATION: '09'
 }
 
 var ledState = {             // Status code
@@ -170,7 +171,7 @@ module.exports = function(input, done) {
             // TODO: Filter data so that podCommand corresponds to the right client #
             var stationTo = ticket.to;
             console.log('Message From Server');
-            console.log('podCommand: ' + data.podCommand);
+            console.log('podMessage: ' + data.podMessage);
             
             // Process message to figure out what XBEE sent
             switch(data.podCommand) {
