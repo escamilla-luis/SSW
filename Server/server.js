@@ -63,6 +63,9 @@ function addToStream(){
 	}
 }
 
+// **FIXME: Find better way to store this global variable
+var closestToStation = null;
+var closestToStation_userId = "";
 function processStream() {
 	// 'stream' is expected to be a complete 8-char string here
 	console.log('Stream: ' + stream);
@@ -76,6 +79,17 @@ function processStream() {
 	console.log('Action Id: ' + actionId);
 	console.log('Action Info: ' + actionInfo);
 	
+	if (actionId == '09') {
+		if (!closestToStation) {
+			if (actionInfo = closestToStation) {
+				closestToStation = null;
+				
+				var index = parseInt(podNum.charAt(1));
+				podSchedule[index] = closestToStation_userId;
+				spawnClientThread(index, closestToStation_userId, 8001 + index);
+			}	
+		}
+	}
 //	var podMessage = podNum + actionId + actionInfo
 //	speaker.request('messageFromPod', {podMessage: podMessage}, onReplyCallback);
 }
@@ -126,17 +140,21 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		if (isNewTicket == true) {
 			console.log('New ticket detected!');
 			console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
-			
-//			var startingStation = snapshot.child('currentTicket').child('from').val();
-//			port.write('0009000' + startingStation);
-			
+						
 			// Handle new ticket
 			var userId = snapshot.key;
 			var ticketRef = firebase.getUserTicketRef(userId);
 			ticketRef.child('isNewTicket').set(false);
 			
+			// Find pod thats closest to station. Assigns to client in 'processStream()'s
+			var startingStation = snapshot.child('currentTicket').child('from').val();
+			closestToStation = '000' + startingStation;
+			closestToStation_userId = userId;
+			port.write('0009000' + startingStation);
+			
+			
 			// Queue pod 
-			fillIfAvailable(userId);
+//			fillIfAvailable(userId);
 		}
 });
 
