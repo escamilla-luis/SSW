@@ -32,7 +32,7 @@ var ledState = {             // Status code
 
 module.exports = function(input, done) {
 //    var podNum = input.podNum + 1;
-    var podNum = 2;
+    var podNum = 6;
     var userId = input.userId;
     var portNum = input.portNum;
     console.log('portNum: ' + portNum);
@@ -65,24 +65,27 @@ module.exports = function(input, done) {
                     console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
-                    var input = formatLocationInput(from, to);
-                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+//                    var input = formatLocationInput(from, to);
+//                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
+                    
+                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0400');
                     sendXbeeCommand(podCommand);
                     
-                    // Set LED on pod
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
-                    sendXbeeCommand(podCommand);
-                    
-//                    var eta = 10;
-//                    var timer = setInterval(function() {
-//                        firebase.setEta(userId, eta);
-//                        eta = eta - 1;
-//                        
-//                        if (eta < 0) {
-//                            firebase.setStatus(userId, 200);
-//                            clearInterval(timer);
-//                        }
-//                    }, 1000);
+                    setTimeout(function() {
+                        sendXbeeCommand(podCommand);
+                    }, 200);
+                        
+                    var eta = 5;
+                    var timer = setInterval(function() {
+                        firebase.setEta(userId, eta);
+                        eta = eta - 1;
+                        
+                        if (eta < 0) {
+                            firebase.setStatus(userId, 200);
+                            clearInterval(timer);
+                        }
+                    }, 1000);
                                         
 //                    updateStatusInDatabases(userId, podNum, 200);
                     break;
@@ -97,6 +100,13 @@ module.exports = function(input, done) {
                     // Pod arrived at user's starting location, waiting for user to get inside
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASH);
                     sendXbeeCommand(podCommand);
+                    
+                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0000');
+                    setTimeout(function() {
+                        sendXbeeCommand(podCommand);
+                    }, 200);
+
+
                     // We should not have to update Firebase for this status from server
 //                    updateStatusInDatabases(userId, podNum, 200); 
                     break;
@@ -109,23 +119,26 @@ module.exports = function(input, done) {
                     console.log('status: ' + 300);
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
-                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0400'); // Continue pod
-                    done({podNum: podNum, podCommand: podCommand});	// Send server message to relay to pod
                     
-//                    var eta = 10;
-//                    var timer = setInterval(function() {
-//                        firebase.setEta(userId, eta);
-//                        eta = eta - 1;
-//                        
-//                        if (eta < 0) {
-//                            firebase.setStatus(userId, 400);
-//                            clearInterval(timer);
-//                        }
-//                    }, 1000);
-                    
-                    // Set LED on pod                    
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
                     sendXbeeCommand(podCommand);
+                    
+                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0400');
+                    setTimeout(function() {
+                        sendXbeeCommand(podCommand);
+                    }, 200);
+
+                    
+                    var eta = 5;
+                    var timer = setInterval(function() {
+                        firebase.setEta(userId, eta);
+                        eta = eta - 1;
+                        
+                        if (eta < 0) {
+                            firebase.setStatus(userId, 400);
+                            clearInterval(timer);
+                        }
+                    }, 1000);
 
 //                    updateStatusInDatabases(userId, podNum, 400);
                     break;
@@ -140,6 +153,12 @@ module.exports = function(input, done) {
                     // Pod arrived at user's destination, waiting for user to exit
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.YELLOW_FLASH);
                     sendXbeeCommand(podCommand);
+                    
+                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0000');
+                    setTimeout(function() {
+                        sendXbeeCommand(podCommand);
+                    }, 200);
+
 //                    updateStatusInDatabases(userId, podNum, 400); // We should not update Firebase for this status from server
                     break;
                 case 900: 
@@ -151,8 +170,14 @@ module.exports = function(input, done) {
                     console.log('status: ' + 900);
                     // User just exited the pod; ride over; (switched from 500)
                     // Tell pod to finish
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.YELLOW);
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.RED_FLASH);
                     sendXbeeCommand(podCommand);
+                    
+                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0100');
+                    setTimeout(function() {
+                        sendXbeeCommand(podCommand);
+                    }, 200);
+
                     
 //                    updateStatusInDatabases(userId, podNum, 900); 
                     done({podNum: podNum, killThread: true});	// Thread tells server to kill it. 
