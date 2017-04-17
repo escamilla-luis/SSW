@@ -9,11 +9,29 @@ var threads = require('threads');
 var config = threads.config;
 var spawn = threads.spawn;
 
+// Constants for Action ID's for pod commands
+var podAction = {
+	GET_LAST_STATION: '01',
+	SET_STATE: '02',
+	GET_STATE: '03',
+	SET_SPEED: '04',
+	GET_SPEED: '05',
+	SET_DESTINATION: '06',
+	GET_LOCATION: '07',
+	SET_NEXT_STATION: '08',
+	GET_CLOSEST_STATION: '09'
+}
+
 /** -== Xbee code ==- **/
 // Path to serialport may be different on other machines
 var pathToPort = '/dev/tty.usbserial-DN01J8BJ';
 var databuffer = [];
 var stream = '';
+
+var user_id_shared = ''; // user id to share between functions
+var startingStation = 0;
+var closestToStationArr = [];
+var closestToStationFlag = false;
 
 // Refresh port every time we call writeToXbee(..)
 var port = new SerialPort(pathToPort, {
@@ -26,10 +44,66 @@ port.on('open', function() {
 	port.on('data', function (dataFromXbee) {
 		// dataFromXbee is a Buffer data type
 		var stringData = dataFromXbee.toString('utf8');
-		console.log('Data from xbee: ' + stringData);
-		queueBuffer(stringData);
+		processStream(data);
+		
+//		queueBuffer(stringData);
 	});
 });
+
+function processStream(data) {
+	// 'stream' is expected to be a complete 8-char string here
+	console.log('Stream: ' + data);
+	
+	var podNum = getPodNumber(data);
+	var actionId = getActionId(data);
+	var actionInfo = getActionInfo(data);
+	stream = ''; // Clear stream (if using buffering to stream data received from pods)
+	
+	console.log('Pod #: ' + podNum);
+	console.log('Action Id: ' + actionId);
+	console.log('Action Info: ' + actionInfo);
+	
+	switch (actionId) {
+		case podAction.GET_CLOSEST_STATION:
+			// Error checking
+			if (!closestToStationFlag) {
+				console.log('Error: Server received action Id ' + actionId + ' but flag was cleared.');
+				console.log('Did you clear your flag too early?')
+			}
+			
+			// Store return data in our array
+			closestToStationArr.push(data);
+			if (closestToStationArr.size == podSchedule.length) {
+				// Should have all return values from pods for getClosestStation() received here
+				for (var y = 0; y < podSchedule.length; y++) {
+					for (var x = 0; x < podSchedule.length; x++) {
+						
+						var podNumber = getPodNumber(closestToStationArr)
+						var closestStations = getActionId(closestToStationArr[y]);
+						
+						var station = closestStations.charAt(x);
+						if (station == targetStation) {
+							
+							assignUserToPodNumber(user_id_shared, podNumber);
+							
+							// FIXME: Need to address how to find next pod if closest pod is unavailable
+							//		This solution only works if all pods are available
+							if (podSchedule[station] != 'free') {
+							
+							}
+						}
+					}
+				}
+			}
+			break;
+		default:
+			console.log('Error: Unrecognized Action ID');
+			break;
+	}
+	
+//	var podMessage = podNum + actionId + actionInfo
+//	speaker.request('messageFromPod', {podMessage: podMessage}, onReplyCallback);
+}
 
 // We open the port, which will fire off our .on('open') callback functiondatabuffer that writes to the xbee.
 port.open(function (err) {
@@ -58,26 +132,9 @@ function addToStream(){
 	if (databuffer.length > 0) {
 		if (databuffer[0] == 'e') {
 			databuffer.shift();
-			processStream();
+			processStream(stream);
 		}
 	}
-}
-
-function processStream() {
-	// 'stream' is expected to be a complete 8-char string here
-	console.log('Stream: ' + stream);
-	
-	var podNum = getPodNumber(stream);
-	var actionId = getActionId(stream);
-	var actionInfo = getActionInfo(stream);
-	stream = ''; // Clear stream
-	
-	console.log('Pod #: ' + podNum);
-	console.log('Action Id: ' + actionId);
-	console.log('Action Info: ' + actionInfo);
-	
-//	var podMessage = podNum + actionId + actionInfo
-//	speaker.request('messageFromPod', {podMessage: podMessage}, onReplyCallback);
 }
 
 function getPodNumber(streamData) {
@@ -122,21 +179,27 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 		// Only assign ticket to client-thread if 'isTicketAlive' == true
 		// Worker threads will fire off listeners as they make changes to the ticket data,
 		// we use isTicketAlive to negate the server handling the same ticket over and over
-		var isNewTicket = snapshot.child('currentTicket').child('isNewTicket').val();
+		var ticketSnapshot = snapshot.child('currentTicket');
+		var isNewTicket = ticketSnapshot.child('isNewTicket').val();
 		if (isNewTicket == true) {
 			console.log('New ticket detected!');
 			console.log('userId: %s, firstName: %s, lastName: %s', userId, firstName, lastName);
-			
-//			var startingStation = snapshot.child('currentTicket').child('from').val();
-//			port.write('0009000' + startingStation);
 			
 			// Handle new ticket
 			var userId = snapshot.key;
 			var ticketRef = firebase.getUserTicketRef(userId);
 			ticketRef.child('isNewTicket').set(false);
 			
+			startingStation = ticketSnapshot.child('from').val();
+			var getClosestToStationActionId = '09';
+			var podCommand = '00' + getClosestToStationActionId + '000' + startingStation;
+			
+			user_id_shared = userId;
+			closestToStationFlag = true;
+			port.write(podCommand);
+			
 			// Queue pod 
-			fillIfAvailable(userId);
+//			fillIfAvailable(userId);
 		}
 });
 
@@ -163,7 +226,7 @@ function spawnClientThread(podNum, userId, portNum) {
 				var podNum = message.podNum;
 				var podCommand = message.podCommand;
 				console.log('client for podNum ' + podNum + ' has sent command: ' + podCommand);
-				
+
 				port.write(podCommand);
 			}
 		});
@@ -174,7 +237,7 @@ function spawnClientThread(podNum, userId, portNum) {
 // A function that fill users based on available pod status
 // If no pods are available, it will add the user to the overflowQueue
 function fillIfAvailable(userId) {
-	
+
 	// Check if its available
 	if (checkForAvailablePod()) {
 		addUserToPodSchedule(userId);
@@ -196,6 +259,13 @@ function addUserToPodSchedule(userId) {
 		}
 		return true; 		// Continue loop
 	});
+}
+
+// Searches for an available pod and add a user to the schedule
+function assignUserToPodNumber(userId, podNumber) {
+	console.log('assignUserToPodNumber()');
+	podSchedule[podNumber] = userId;
+	spawnClientThread(podNumber, userId, 8001 + podNumber);
 }
 
 // We can call this function here when there is a new ticket to deal

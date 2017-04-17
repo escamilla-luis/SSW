@@ -13,7 +13,7 @@ var podAction = {
     SET_DESTINATION: '06',
     GET_LOCATION: '07',
     SET_NEXT_STATION: '08',
-    CLOSEST_TO_STATION: '09'
+    GET_CLOSEST_STATION: '09'
 }
 
 var ledState = {             // Status code
@@ -98,7 +98,7 @@ module.exports = function(input, done) {
                     console.log('status: ' + 200);
                     // TODO: Sync LED color of pod with color displayed on mobile app.
                     // Pod arrived at user's starting location, waiting for user to get inside
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN_FLASH);
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.BLUE_FLASH);
                     sendXbeeCommand(podCommand);
                     
                     podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0000');
