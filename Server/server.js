@@ -74,22 +74,25 @@ function processStream(data) {
 			// Store return data in our array
 			closestToStationArr.push(data);
 			if (closestToStationArr.size == podSchedule.length) {
+				console.log(closestToStationArr);
 				// Should have all return values from pods for getClosestStation() received here
 				for (var y = 0; y < podSchedule.length; y++) {
 					for (var x = 0; x < podSchedule.length; x++) {
 						
-						var podNumber = getPodNumber(closestToStationArr)
+						// 0 X - 0 Y - A B C D
+						var podNumber = getPodNumber(closestToStationArr[y])
 						var closestStations = getActionId(closestToStationArr[y]);
 						
-						var station = closestStations.charAt(x);
-						if (station == targetStation) {
+						var closeststation = closestStations.charAt(x);
+						if (closestStation == targetStation) {
 							
 							assignUserToPodNumber(user_id_shared, podNumber);
 							
 							// FIXME: Need to address how to find next pod if closest pod is unavailable
 							//		This solution only works if all pods are available
-							if (podSchedule[station] != 'free') {
-							
+							// 		-- filter out list of pod return values [a,b,c,d] before
+							//		   doing the double for-loop 
+							if (podSchedule[podNumber] != 'free') {
 							}
 						}
 					}
