@@ -13,7 +13,10 @@ var podAction = {
     SET_DESTINATION: '06',
     GET_LOCATION: '07',
     SET_NEXT_STATION: '08',
-    GET_CLOSEST_STATION: '09'
+    GET_CLOSEST_STATION: '09',    
+    STOPPED_AT_STATION: '10',
+    PROCEED: '11'
+
 }
 
 var ledState = {             // Status code
@@ -65,27 +68,14 @@ module.exports = function(input, done) {
                     console.log('status: ' + 100);
                     // FIXME: This assumes the pod is at station 1 when user orders a ticket
                     // Tells pod to go to user's starting location
-//                    var input = formatLocationInput(from, to);
-//                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
-                    
-                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0400');
+                    var input = formatLocationInput(from, to);
+                    podCommand = messageFormatter(podNum, podAction.SET_DESTINATION, input);
                     sendXbeeCommand(podCommand);
                     
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.PURPLE_FLASH);
                     setTimeout(function() {
                         sendXbeeCommand(podCommand);
-                    }, 200);
-                        
-                    var eta = 5;
-                    var timer = setInterval(function() {
-                        firebase.setEta(userId, eta);
-                        eta = eta - 1;
-                        
-                        if (eta < 0) {
-                            firebase.setStatus(userId, 200);
-                            clearInterval(timer);
-                        }
-                    }, 1000);
+                    }, 300);
                                         
 //                    updateStatusInDatabases(userId, podNum, 200);
                     break;
@@ -100,12 +90,6 @@ module.exports = function(input, done) {
                     // Pod arrived at user's starting location, waiting for user to get inside
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.BLUE_FLASH);
                     sendXbeeCommand(podCommand);
-                    
-                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0000');
-                    setTimeout(function() {
-                        sendXbeeCommand(podCommand);
-                    }, 200);
-
 
                     // We should not have to update Firebase for this status from server
 //                    updateStatusInDatabases(userId, podNum, 200); 
@@ -120,26 +104,14 @@ module.exports = function(input, done) {
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
                     
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.GREEN);
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.PURPLE_FLASH);
                     sendXbeeCommand(podCommand);
                     
-                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0400');
+                    podCommand = messageFormatter(podNum, podAction.PROCEED, '0000');
                     setTimeout(function() {
                         sendXbeeCommand(podCommand);
-                    }, 200);
-
+                    }, 300);
                     
-                    var eta = 5;
-                    var timer = setInterval(function() {
-                        firebase.setEta(userId, eta);
-                        eta = eta - 1;
-                        
-                        if (eta < 0) {
-                            firebase.setStatus(userId, 400);
-                            clearInterval(timer);
-                        }
-                    }, 1000);
-
 //                    updateStatusInDatabases(userId, podNum, 400);
                     break;
                 case 400:
@@ -153,11 +125,6 @@ module.exports = function(input, done) {
                     // Pod arrived at user's destination, waiting for user to exit
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.YELLOW_FLASH);
                     sendXbeeCommand(podCommand);
-                    
-                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0000');
-                    setTimeout(function() {
-                        sendXbeeCommand(podCommand);
-                    }, 200);
 
 //                    updateStatusInDatabases(userId, podNum, 400); // We should not update Firebase for this status from server
                     break;
@@ -170,14 +137,8 @@ module.exports = function(input, done) {
                     console.log('status: ' + 900);
                     // User just exited the pod; ride over; (switched from 500)
                     // Tell pod to finish
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.RED_FLASH);
+                    podCommand = messageFormatter(podNum, podAction.PROCEED, 0000);
                     sendXbeeCommand(podCommand);
-                    
-                    podCommand = messageFormatter(podNum, podAction.SET_SPEED, '0100');
-                    setTimeout(function() {
-                        sendXbeeCommand(podCommand);
-                    }, 200);
-
                     
 //                    updateStatusInDatabases(userId, podNum, 900); 
                     done({podNum: podNum, killThread: true});	// Thread tells server to kill it. 
@@ -193,21 +154,20 @@ module.exports = function(input, done) {
         listener.on('messageFromPod', function(message, data) {
             
             // TODO: Filter data so that podCommand corresponds to the right client #
-            var stationTo = ticket.to;
             console.log('Message From Server');
-            console.log('podMessage: ' + data.podMessage);
+            console.log('podStatus: ' + data.podStatus);
             
             // Process message to figure out what XBEE sent
-            switch(data.podCommand) {
-                case 'arrivedAtPickup':	 //Pod arrived at Pickup
+            switch(data.podStatus) {
+                case 200:	 //Pod arrived at Pickup
                     console.log('switch - arrivedAtPickup');
                     //Update status code: user must enter pod
-//                    updateStatusInDatabases(userId, podNum, 200);
+                    updateStatusInDatabases(userId, podNum, 200);
                     break;
-                case 'arrivedAtDestination':  //Pod arrived at Dropoff
+                case 400:  //Pod arrived at Dropoff
                     console.log('switch - arrivedAtDestination');
                     //Update status code: user must disembark
-//                    updateStatusInDatabases(userId, podNum, 400);
+                    updateStatusInDatabases(userId, podNum, 400);
                     break;
                 default:
                     message.reply("Unrecognized message");

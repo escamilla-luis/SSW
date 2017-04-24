@@ -19,17 +19,25 @@ var podAction = {
 	SET_DESTINATION: '06',
 	GET_LOCATION: '07',
 	SET_NEXT_STATION: '08',
-	GET_CLOSEST_STATION: '09'
+	GET_CLOSEST_STATION: '09',
+	STOPPED_AT_STATION: '10',
+	PROCEED: '11'
 }
 
 /** -== Xbee code ==- **/
 // Path to serialport may be different on other machines
-var pathToPort = '/dev/tty.usbserial-DN01J8BJ';
+var pathToPort = '/dev/tty.usbserial-DA005SHK';
 var databuffer = [];
 var stream = '';
 
-var user_id_shared = ''; // user id to share between functions
-var startingStation = 0;
+// Global, shared variables between functions used for pod scheduling
+//var podSchedule = ['free', 'free', 'free', 'free'];
+var podSchedule = ['free'];
+var overflowQueue = []; // .push() to enqueue, .shift() to dequeue
+
+var numFreePods = 0;
+var userIdShared = ''; // 
+var startingStationShared = 0;
 var closestToStationArr = [];
 var closestToStationFlag = false;
 
@@ -44,7 +52,7 @@ port.on('open', function() {
 	port.on('data', function (dataFromXbee) {
 		// dataFromXbee is a Buffer data type
 		var stringData = dataFromXbee.toString('utf8');
-		processStream(data);
+		processStream(stringData);
 		
 //		queueBuffer(stringData);
 	});
@@ -65,6 +73,7 @@ function processStream(data) {
 	
 	switch (actionId) {
 		case podAction.GET_CLOSEST_STATION:
+			console.log('GET_CLOSEST_STATION');
 			// Error checking
 			if (!closestToStationFlag) {
 				console.log('Error: Server received action Id ' + actionId + ' but flag was cleared.');
@@ -73,21 +82,23 @@ function processStream(data) {
 			
 			// Store return data in our array
 			closestToStationArr.push(data);
-			if (closestToStationArr.size == podSchedule.length) {
+			if (closestToStationArr.length == podSchedule.length) {
 				console.log(closestToStationArr);
 				// Should have all return values from pods for getClosestStation() received here
 				for (var y = 0; y < podSchedule.length; y++) {
 					for (var x = 0; x < podSchedule.length; x++) {
 						
-						// 0 X - 0 Y - A B C D
+						console.log('x: ' + x + ', y: ' + y);
+						// 0X - 0Y - ABCD  ->  format of data
 						var podNumber = getPodNumber(closestToStationArr[y])
-						var closestStations = getActionId(closestToStationArr[y]);
-						
-						var closeststation = closestStations.charAt(x);
-						if (closestStation == targetStation) {
+						var closestStations = getActionInfo(closestToStationArr[y]);
+						var closestStation = closestStations.charAt(x);
+						if (closestStation == startingStationShared) {
 							
-							assignUserToPodNumber(user_id_shared, podNumber);
-							
+							var podNumInteger = parseInt(podNumber);
+							assignUserToPodNumber(userIdShared, podNumInteger);
+							closestToStationArr = []; // clear array
+							return;
 							// FIXME: Need to address how to find next pod if closest pod is unavailable
 							//		This solution only works if all pods are available
 							// 		-- filter out list of pod return values [a,b,c,d] before
@@ -98,6 +109,11 @@ function processStream(data) {
 					}
 				}
 			}
+			break;
+		case podAction.STOPPED_AT_STATION:
+			var podStatus = actionId.substring(0, 3);
+			console.log(podStatus);
+			speaker.request('messageFromPod', { podStatus: podStatus }, onReplyCallback);
 			break;
 		default:
 			console.log('Error: Unrecognized Action ID');
@@ -159,9 +175,8 @@ var onReplyCallback = function(replyData) {
 	console.log(replyData.message);
 }
 
+
 /** -== Server/Client code ==- **/
-var podSchedule = ['free', 'free', 'free', 'free'];
-var overflowQueue = []; // .push() to enqueue, .shift() to dequeue
 
 // This callback gets executed when the client sends the server a reply 
 // letting it know that it's task is completed
@@ -193,21 +208,42 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 			var ticketRef = firebase.getUserTicketRef(userId);
 			ticketRef.child('isNewTicket').set(false);
 			
-			startingStation = ticketSnapshot.child('from').val();
-			var getClosestToStationActionId = '09';
-			var podCommand = '00' + getClosestToStationActionId + '000' + startingStation;
-			
-			user_id_shared = userId;
+			startingStationShared = ticketSnapshot.child('from').val();			
+			userIdShared = userId;
 			closestToStationFlag = true;
-			port.write(podCommand);
+			collectClosestStations();
 			
 			// Queue pod 
 //			fillIfAvailable(userId);
 		}
 });
 
+function collectClosestStations() {
+	// Get number of free pods by filtering the pod schedule
+	numFreePods = podSchedule.filter(function(element, i) {
+		return element == 'free';
+	}).length;
+	
+		console.log(numFreePods);
+	// Ask all pods that are available ('free') for closest stations
+	var delay = 400;
+	podSchedule.forEach(function(element, index) {
+		if (element == 'free') {
+			// (index + 1)  -> pod number (since index starts at 0)
+			// 09 -> action id for getClosestStation()
+			var podNumber = (index + 1);
+			var podCommand = '0' + '3' + '09' + '0000';
+			console.log(podCommand);
+			setTimeout(function() {
+				port.write(podCommand);
+			}, delay);
+			delay += 400;
+		}
+	});
+}
+
 function spawnClientThread(podNum, userId, portNum) {
-	console.log('spawning client');
+	console.log('spawning client\n');
 	var thread = spawn('client.js');
 	thread
 		.send({
