@@ -32,7 +32,7 @@ var ledState = {             // Status code
     YELLOW_FLASH: '0010',    // 400
 }
 
-
+var listener = messenger.createListener(8006);
 module.exports = function(input, done) {
 //    var podNum = input.podNum + 1;
     var podNum = 6;
@@ -42,7 +42,7 @@ module.exports = function(input, done) {
     var status =- 1;
     
     //Creates Listener for server communication
-    var listener = messenger.createListener(portNum);
+//    listener = messenger.createListener(portNum);
     
     //Thread spawns and receives ticket
     //Get ticket information (Firebase)
@@ -75,7 +75,7 @@ module.exports = function(input, done) {
                     podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.PURPLE_FLASH);
                     setTimeout(function() {
                         sendXbeeCommand(podCommand);
-                    }, 300);
+                    }, 1500);
                                         
 //                    updateStatusInDatabases(userId, podNum, 200);
                     break;
@@ -104,13 +104,14 @@ module.exports = function(input, done) {
                     // User just entered the pod (switched from 200)
                     // Tell pod to go to destination
                     
-                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.PURPLE_FLASH);
+
+                    podCommand = messageFormatter(podNum, podAction.PROCEED, '0000');
                     sendXbeeCommand(podCommand);
                     
-                    podCommand = messageFormatter(podNum, podAction.PROCEED, '0000');
+                    podCommand = messageFormatter(podNum, podAction.SET_STATE, ledState.PURPLE_FLASH);
                     setTimeout(function() {
                         sendXbeeCommand(podCommand);
-                    }, 300);
+                    }, 1500);
                     
 //                    updateStatusInDatabases(userId, podNum, 400);
                     break;
@@ -158,7 +159,7 @@ module.exports = function(input, done) {
             console.log('podStatus: ' + data.podStatus);
             
             // Process message to figure out what XBEE sent
-            switch(data.podStatus) {
+            switch(parseInt(data.podStatus)) {
                 case 200:	 //Pod arrived at Pickup
                     console.log('switch - arrivedAtPickup');
                     //Update status code: user must enter pod
@@ -170,9 +171,13 @@ module.exports = function(input, done) {
                     updateStatusInDatabases(userId, podNum, 400);
                     break;
                 default:
-                    message.reply("Unrecognized message");
+                    message.reply({message: podNum + ": Unrecognized message"});
             }
-            message.reply({message: podNum + ': Received Message'});
+            
+            setTimeout(function() {
+                 message.reply({message: podNum + ': Received Message'});
+            }, 1000);
+           
         });    
     });
     
@@ -190,7 +195,7 @@ function userDeparted() {
 //Updates both firebase and mySQL status columns when called
 function updateStatusInDatabases(userId, podNum, status) {
     firebase.setStatus(userId, status);
-    mysql.setStatus(status, podNum); // FIXME: MySQL interface needs to be tested
+//    mysql.setStatus(status, podNum); // FIXME: MySQL interface needs to be tested
 }
 
 function formatLocationInput(from, to) {

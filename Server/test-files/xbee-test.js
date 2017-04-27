@@ -2,7 +2,7 @@ var util = require('util');
 var SerialPort = require('serialport');
 
 // Path to serialport may be different on different machines
-var pathToPort = '/dev/tty.usbserial-DA005SHK';
+var pathToPort = '/dev/tty.usbserial-DN01J57O';
 
 // Refresh port every time we call writeToXbee(..)
 var port = new SerialPort(pathToPort, {
@@ -31,9 +31,9 @@ port.open(function (err) {
 setTimeout(function() {
     
     console.log('Writing value');
-//    port.write('03040200');
-    port.write('03060104');
-//    port.write('03020000');
+    port.write('06020003');
+//    port.write('06060104');
+//    port.write('06110000');
 //    lightShow();
 }, 200);
 
@@ -41,7 +41,7 @@ setTimeout(function() {
 function lightShow() {
     var i = 1;
     setInterval(function() {
-        port.write('0302000' + i);
+        port.write('0602000' + i);
         i += 2;
         if (i > 9) { i = 1; }
     }, 100);

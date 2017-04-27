@@ -26,7 +26,7 @@ var podAction = {
 
 /** -== Xbee code ==- **/
 // Path to serialport may be different on other machines
-var pathToPort = '/dev/tty.usbserial-DA005SHK';
+var pathToPort = '/dev/tty.usbserial-DN01J57O';
 var databuffer = [];
 var stream = '';
 
@@ -71,6 +71,11 @@ function processStream(data) {
 	console.log('Action Id: ' + actionId);
 	console.log('Action Info: ' + actionInfo);
 	
+	// Update speaker port #
+	var port_number = 8000 + parseInt(podNum);
+	console.log('Speaker port #: ' + port_number);
+	var speaker = messenger.createSpeaker(port_number);
+	
 	switch (actionId) {
 		case podAction.GET_CLOSEST_STATION:
 			console.log('GET_CLOSEST_STATION');
@@ -111,9 +116,13 @@ function processStream(data) {
 			}
 			break;
 		case podAction.STOPPED_AT_STATION:
-			var podStatus = actionId.substring(0, 3);
-			console.log(podStatus);
-			speaker.request('messageFromPod', { podStatus: podStatus }, onReplyCallback);
+			console.log('STOPPED_AT_STATION');
+			var podStatus = actionInfo.substring(0, 3);
+			console.log('podStatus: ' + podStatus);
+			setTimeout(function() {
+				console.log('SPEAKER.REQUEST');
+				speaker.request('messageFromPod', { podStatus: podStatus }, onReplyCallback);	
+			}, 1500);
 			break;
 		default:
 			console.log('Error: Unrecognized Action ID');
@@ -169,10 +178,9 @@ function getActionInfo(streamData) {
 }
 
 /** -== Node.js messenger API ==- **/
-var speaker = messenger.createSpeaker(8001);
+//speaker = messenger.createSpeaker(8006);
 var onReplyCallback = function(replyData) {
-	console.log('onReplyCallback');
-	console.log(replyData.message);
+	console.log('onReplyCallback: ' + replyData.message);
 }
 
 
@@ -212,6 +220,7 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 			userIdShared = userId;
 			closestToStationFlag = true;
 			collectClosestStations();
+			spawnClientThread(6, userId, 8006)
 			
 			// Queue pod 
 //			fillIfAvailable(userId);
