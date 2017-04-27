@@ -33,7 +33,30 @@
 //////////////////////////////////// PIN DEFINITIONS ////////////////////////////////////////////////////////
 /* Note: For Xbee Pro, Channel CH = C, Pan ID = 2017
  *  
- */
+// */
+//// Pins 0 and 1 on the Mega are used for Xbee Comms
+///* Note: For RFID reader - SDA (PIN 9), SCK (PIN 52), MOSI (PIN 51),
+// *  MISO (PIN 50), RST (PIN 8).
+// */
+//#define motor1          2   // Interrupt 0
+//#define motor2          3   // Interrupt 1
+//#define SERVO           5   // Servo pin
+//#define RED             10  // STOP and Error status
+//#define GREEN           11  // GO status
+//#define BLUE            12  // Status of the podcar
+//#define motor1_enco_a   18  // Interrupt 5
+//#define motor1_enco_b   19  // Interrupt 4
+//int     POS_SENSOR1 =   A0; // Post Sensor
+//int     POS_SENSOR2 =   A1; // Post Sensor
+//#define ECHO            22  // Echo pin
+//#define TRIG            23  // Trig pin
+//#define KILL_SWITCH     24  // Kill switch
+//#define RESET           25  // Resets the system after error status has been acknowledged
+//#define HALL_SENSOR1    26  // Switch servo motor using hall effect sensor mounted on left of podcar
+//#define HALL_SENSOR2    27  // Switch servo motor using hall effect sensor mounted on right of podcar
+//#define motor2_enco_a   28  // Interrupt 3 
+//#define motor2_enco_b   29  // Interrupt 2
+
 // Pins 0 and 1 on the Mega are used for Xbee Comms
 /* Note: For RFID reader - SDA (PIN 9), SCK (PIN 52), MOSI (PIN 51),
  *  MISO (PIN 50), RST (PIN 8).
@@ -44,20 +67,20 @@
 #define RED             10  // STOP and Error status
 #define GREEN           11  // GO status
 #define BLUE            12  // Status of the podcar
-#define motor1_enco_a   18  // Interrupt 5
+#define KILL_SWITCH     18  // Interrupt 5
 #define motor1_enco_b   19  // Interrupt 4
-int     POS_SENSOR1 =   A0; // Post Sensor
-int     POS_SENSOR2 =   A1; // Post Sensor
+int     POS_SENSOR1 =   A4; // Post Sensor
+int     POS_SENSOR2 =   A5; // Post Sensor
 #define ECHO            22  // Echo pin
 #define TRIG            23  // Trig pin
-#define KILL_SWITCH     24  // Kill switch
+#define ECHO2           49  // Second Echo Pin
+#define TRIG2           48  // Second Trig Pin
+//#define KILL_SWITCH     24  // Kill switch
 #define RESET           25  // Resets the system after error status has been acknowledged
-#define HALL_SENSOR1    26  // Switch servo motor using hall effect sensor mounted on left of podcar
-#define HALL_SENSOR2    27  // Switch servo motor using hall effect sensor mounted on right of podcar
+#define HALL_SENSOR1    20  // Switch servo motor using hall effect sensor mounted on left of podcar
+#define HALL_SENSOR2    21  // Switch servo motor using hall effect sensor mounted on right of podcar
 #define motor2_enco_a   28  // Interrupt 3 
 #define motor2_enco_b   29  // Interrupt 2
-
-
 
 ////////////////////////////////// SYSTEM VARIABLES /////////////////////////////////////////////////////////
 // For button state
@@ -87,7 +110,11 @@ boolean reset_latch_state = true;
 // Stores the state of each button
 int reset_state;
 int killStatePressedTwice;
+
+// Additional values for the two switches
 bool checkForSecondKillPress;
+bool needToFlush;
+volatile bool killStateNotRefreshed;
 
 
 // Used for the ultrasonic sensor
@@ -110,8 +137,8 @@ float vel1, vel2;
 
 
 // Variables used to store the readings from the hall effect sensors
-int hall_1_state = 1;
-int hall_2_state = 1;
+volatile int hall_1_state = 1;
+volatile int hall_2_state = 1;
 
 
 /* Note: RGB LED- Green (GO status), RED (STOP), BLUE (Hall effect sensor reading)
@@ -132,6 +159,7 @@ int  CHECKPOINT = 0;
 long SSN = 0;
 int howLongToStayAtStation;
 bool stillAtStation;
+bool serverGoFromStation;
 
 // Station and Checkpoint Numbers
 int STATIONONE;
@@ -144,6 +172,7 @@ int CHECKPOINTTWO;
 int CHECKPOINTTHREE;
 int CHECKPOINTFOUR;
 
+// To tell if a packet is sent or not
 bool didSendStationPacket = true;
 
 // The isCard result value
@@ -157,7 +186,7 @@ long SPEED;
 int maximumSpeed;
 int STATEOFCAR;
 int STATEOFCARFROMSERVER;
-int SERVOINT;
+volatile int SERVOINT;
 int incrementByFifty;
 
 // Positioning Variables
@@ -183,15 +212,31 @@ int commands[8];
 #define SEND_PATH2      7       // buttons and are temporary
 
 // The array for the 12 paths 
-StackArray <int> scheduleArray;
+volatile StackArray <int> scheduleArray;
+
+// 8 different paths a podcar can take from anywhere to a station
+int exactlyAfterStationOneFour[] = {1,1,1,0};
+int exactlyBeforeStationTwoThree[] = {0,0};
+
+int afterStationOneFourToTwoThree[] = {1,1,0,0};
+int passMiddleIntoStationOneFour[] = {1,0};
+
+int fromMiddleIntoStationOneFour[] = {1,1,0};
+int fullCircleIntoStationTwoThree[] = {1,1,1,0,0};
+
+int halfCircleIntoStationTwoThree[] = {1,0,0};
+int switchIntoClosestStation[] = {0};
+
+// Before or After magnet value
+volatile bool isBeforeMagnet;
 
 // 12 different paths a podcar can take from station to station
 int path1to2[]={0, 0}; //0 for a 
-int path1to3[]={1, 0}; //1 for a
+int path1to3[]={1, 1, 0, 0}; //1 for a
 int path1to4[]={1, 0}; //2 for a
 
 int path2to1[]={0}; //3 for a
-int path2to3[]={1, 1, 1, 0}; //4 for a
+int path2to3[]={1, 1, 1, 0, 0}; //4 for a
 int path2to4[]={1, 1, 0}; //5 for a
 
 int path3to1[]={1, 1, 0}; //6 for a
@@ -210,8 +255,10 @@ int lastStationInDestination;
 Servo leverArm;
 
 // Podcar number
-int podNumber = 3;
+int podNumber = 6;
 bool testStack;
+
+volatile bool checkingInter = false;
 
 ///////////////////////////////////////// SETUP /////////////////////////////////////////////////////////////
 void setup()
@@ -220,17 +267,19 @@ void setup()
   pinMode(motor1, OUTPUT);
   pinMode(motor2, OUTPUT);
   pinMode(TRIG, OUTPUT);
+  pinMode(TRIG2, OUTPUT);
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
   pinMode(BLUE, OUTPUT);
   
 
   // Inputs
-  pinMode(motor1_enco_a, INPUT);
+  //pinMode(motor1_enco_a, INPUT);
   pinMode(motor1_enco_b, INPUT);
   pinMode(motor2_enco_a, INPUT);
   pinMode(motor2_enco_b, INPUT);
   pinMode(ECHO, INPUT);
+  pinMode(ECHO2, INPUT);
   pinMode(KILL_SWITCH, INPUT_PULLUP);
   pinMode(RESET, INPUT_PULLUP);
   pinMode(HALL_SENSOR1, INPUT);
@@ -243,7 +292,7 @@ void setup()
   pinMode(SEND_PATH2, INPUT_PULLUP);
 
   // Turn on pull-up resistors
-  digitalWrite(motor1_enco_a, HIGH);       
+  //digitalWrite(motor1_enco_a, HIGH);       
   digitalWrite(motor1_enco_b, HIGH);       
   digitalWrite(motor2_enco_a, HIGH);     
   digitalWrite(motor2_enco_b, HIGH);     
@@ -269,13 +318,15 @@ void setup()
   checkForSecondKillPress = false;
 
   // initialize SPEED and set initial STATE
-  SPEED = 0;
+  SPEED = 600;
   maximumSpeed = 700;
   STATEOFCAR = 5;
   SERVOINT = 140;
   incrementByFifty = 50;
   howLongToStayAtStation = 0;
   stillAtStation = false;
+  //serverGoFromStation = true; // change false when using the server
+  serverGoFromStation = false; // change false when using the server
 
   // For the track
   STATIONONE = 35;
@@ -299,16 +350,41 @@ void setup()
 //  CHECKPOINTTHREE = 176;
 //  CHECKPOINTFOUR = 213;
 
+  // change to bool function later
+  // initialize the before/afer magnet value
+  isBeforeMagnet = true;
+  isMagnetNotRead = true;
+
   // initialize the ultrasonic values
   countForUltrasonic = 0;
   stillInRangeUltrasonic = false;
 
   // Setup the servo
   leverArm.attach(SERVO);
-  leverArm.write(SERVOINT);
+  leverArm.write(SERVOINT);  
+
+  // Interrupts
+  attachInterrupt(digitalPinToInterrupt(HALL_SENSOR1), IfSmartMagnetDetected, FALLING);
+  attachInterrupt(digitalPinToInterrupt(HALL_SENSOR2), IfDumbMagnetDetected, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(KILL_SWITCH), inKilledState, FALLING);
+
+  // Needed to flush the initial XBee Serial so it does not get interrupted when turned on.
+  // Only set true in the initial kill state.
+  needToFlush = true;
 
   // This is how the vehicle performs the killed state
   inKilledState();
+
+  if (needToFlush) {
+    while (Serial.available() > 0) {
+      Serial.read();
+    }
+  }
+
+  killStateNotRefreshed = true;
+
+  // Set false after initial kill state.
+  needToFlush = false;
 
   isNotAtLastStationInDestination = false;
   lastStationInDestination = 0;
@@ -317,24 +393,18 @@ void setup()
 
   isFirstPosTickThrough = true;
   isSecondPosTickThrough = true;
+
+  
 }
 
 //////////////////////////////////////// MAIN CODE //////////////////////////////////////////////////////////
 void loop()
 { 
-  //testRFID();
-  RFIDisCard = RC522.isCard();
-
-  if (!RFIDisCard) {
-    RFIDisCard = RC522.isCard();
-  }
+  // reattach kill switch interrupt if it was detached inside inKilledState method
+//  if(killStateNotRefreshed) {
+//    attachInterrupt(digitalPinToInterrupt(KILL_SWITCH), inKilledState, FALLING);
+//  }
   
-  // Read the magnets
-  magnetRead();
-  
-  // Catches the information sent from the server
-  receiveXbeeMessage();
-
   // Makes the packets of information do something when it is full
   if ((String(commands[2]) + String(commands[3])).toInt() > 0){
     resolveReceivedPacketData();
@@ -343,31 +413,35 @@ void loop()
   // System controls
   controls();
 
-  // Counting the Ticks from each checkpoint
-  //int thisisavalue = getTicks();
+  // Catches the information sent from the server
+  receiveXbeeMessage();
 
-  // Retrieve the speed of the motors
-  // getSpeedOfMotors();
+//  if(checkingInter) {
+//    Serial.println("yo nice interrupt");
+//  }
 
-  if (testStack) {
-    setStackArray(2,3);
-    testStack = false;
-  }
-  
+  //delay(10000);
 
-  // Signal2Path2Stack(); // Nested Functions that takes thesignal, determines the path, 
-                       // then generates the stack
-
-  // IfSmartMagnetDetected();
-  
-  // Lever arm should switch with right arm up regardless of path destination
-  // IfDumbMagnetDetected();
+//  if (testStack) {
+//    setStackArray(2,3);
+//    testStack = false;
+//  }
 }
 
 //////////////////////////////////////// CONTROLS ///////////////////////////////////////////////////////////
 // Function that controls the functions of the system
 void controls()
 { 
+    //testRFID();
+    RFIDisCard = RC522.isCard();
+  
+    if (!RFIDisCard) {
+      RFIDisCard = RC522.isCard();
+    }
+    
+    // Read the magnets
+    //magnetRead();
+    
     // LED is blinking red if button is pressed
     if (killState())
     {
@@ -377,7 +451,7 @@ void controls()
 
      // Changed distance from 30 cm to 15 cm due to pole obstacle
     // LED is Red when statement is true
-    else if (isSomethingInFront())
+    if (isSomethingInFront())
     {
       STATEOFCAR = 1;
       setStateLED(STATEOFCAR);
@@ -386,19 +460,20 @@ void controls()
     }
 
     // Checks to see if the hall effect sensor on the left of podcar read a magnet
-    else if (hall_1_state == 0 || hall_2_state == 0)
-    {
-      // Checks the Magnets
-      if (isMagnetNotRead) {
-        IfSmartMagnetDetected();
-        IfDumbMagnetDetected();
-        isMagnetNotRead = false;
-      }
-      
-      STATEOFCAR = 3;
-      setStateLED(STATEOFCAR);
-      speedUpFromStop();
-    } 
+//    else if (hall_1_state == 0 || hall_2_state == 0)
+//    {
+//      // Checks the Magnets
+//      if (isMagnetNotRead) {
+//        IfSmartMagnetDetected();
+//        IfDumbMagnetDetected();
+//        isMagnetNotRead = false;         
+//      }
+//
+//      STATEOFCAR = 3;
+//      setStateLED(STATEOFCAR);
+//      speedUpFromStop();
+//      
+//    } 
 
     // Checks to see if podcar passes an RFID card
     else if (RFIDisCard)
@@ -409,19 +484,31 @@ void controls()
       
       // Checks if the RFID is a station or not
       if (isAtStation()) {        
-        STATIONID = getStationNumber();        
+        STATIONID = getStationNumber(); 
+
+        if (lastStationInDestination == STATIONID) {
+          isNotAtLastStationInDestination = false;
+        } 
+        
+        else {
+          isNotAtLastStationInDestination = true;
+        }
 
         // Send Packet to Server first time
         if (didSendStationPacket) {
-          createPacket(0,podNumber,0,10,0,0,0,getStationNumber());
-          sendXbee();
-          commands[3] = 0;
-          didSendStationPacket = false;
-        }
-    
-        if (lastStationInDestination == STATIONID) {
-          isNotAtLastStationInDestination = false;
-        }
+          if (isNotAtLastStationInDestination) {
+            createPacket(0,podNumber,1,0,2,0,0,getStationNumber());
+            sendXbee();
+            commands[3] = 0;
+            didSendStationPacket = false;
+          }
+          else {
+            createPacket(0,podNumber,1,0,4,0,0,getStationNumber());
+            sendXbee();
+            commands[3] = 0;
+            didSendStationPacket = false;
+          }
+        }            
 
         // Decide to stay or go
         if (isStoppedAtStation()) {
@@ -434,6 +521,7 @@ void controls()
       }
       else {
         CHECKPOINT = getCheckpointNumber();
+        isBeforeMagnet = true;
         speedUpFromStop(); 
       }
     }
@@ -442,24 +530,34 @@ void controls()
     else
     {
       // Checks if the pod is going from destination to destination
-//      if (!isNotAtLastStationInDestination) {
-//        // The default state for the car
-//        STATEOFCAR = 5;
-//        setStateLED(STATEOFCAR);
-//      }
-//      else {
-//        // The state when the car is going from station to station
-//        setStateLED(STATEOFCAR);
-//      }
+      if (!isNotAtLastStationInDestination) {
+        // The default state for the car
+        STATEOFCAR = 5;
+        setStateLED(STATEOFCAR);
+      }
+      else {
+        // The state when the car is going from station to station
+        setStateLED(STATEOFCAR);
+      }
 //      STATEOFCAR = 5;
-      setStateLED(STATEOFCAR);
+//      setStateLED(STATEOFCAR);
       isMagnetNotRead = true;
+      //setSpeedOfMotors(SPEED);
       speedUpFromStop();
       leverArm.write(SERVOINT);
       howLongToStayAtStation = 0;
       getTicks();
+
       didSendStationPacket = true;  
+      //checkingInter = false;
+//      Serial.println("testing ticks: ");  
+//      Serial.println(getTicks());
+      serverGoFromStation = false; // uncomment when using the server
     }
+}
+
+void testInter(){
+  checkingInter = true;
 }
 
 ///////////////////////////////////// RESOLVE PACKET DATA ////////////////////////////////////////////////////////////
@@ -473,7 +571,7 @@ void resolveReceivedPacketData() {
     int actionId;
   
     // initialization of ActionId
-    if ((String(commands[2]) + String(commands[3])).toInt() != 0) {
+    if ((String(commands[2]) + String(commands[3])).toInt() > 0) {
       actionId = (String(commands[2]) + String(commands[3])).toInt();
     }
   
@@ -482,6 +580,8 @@ void resolveReceivedPacketData() {
     int secondPos;
     int thirdPos;
     String ticks;
+
+    int closestStationNumberToThisCar;
   
     // switch based on which command was received from server
     switch (actionId) {
@@ -510,7 +610,7 @@ void resolveReceivedPacketData() {
   
         // Create a packet to send to the server
         createPacket(commands[0], commands[1], commands[2], commands[3], 
-                    0, 0, 0, commands[getStateLED()]);
+                    0, 0, 0, getStateLED());
   
         // Sends the packet to the server
         sendXbee();
@@ -520,8 +620,8 @@ void resolveReceivedPacketData() {
       case 4: 
   
         // Sets the Speed of the Podcars. Might be useful for future iterations of this code
-        maximumSpeed = (String(commands[5]) + String(commands[6]) + String(commands[7])).toInt();
-        setSpeedOfMotors(maximumSpeed);
+        SPEED = (String(commands[5]) + String(commands[6]) + String(commands[7])).toInt();
+        setSpeedOfMotors(SPEED);
         break;
   
       //getSpeed function
@@ -545,6 +645,7 @@ void resolveReceivedPacketData() {
   
         // Use the values from the packet to create a set track from one station to the next
         setStackArray(commands[5], commands[7]);
+        toStation(commands[5]);
         lastStationInDestination = commands[7];
         isNotAtLastStationInDestination = true;
         break;
@@ -576,13 +677,51 @@ void resolveReceivedPacketData() {
       case 9:
 
         // Get the closest station number
-        int closestStationNumberToThisCar = getClosestStationNumber();
+        closestStationNumberToThisCar = getClosestStationNumber();
 
-        // Create packet to send to the server
-        createPacket(commands[0], commands[1], commands[2], commands[3], 
-                    0, 0, 0, closestStationNumberToThisCar);
+        switch (closestStationNumberToThisCar) {
+          case 1:
+            createPacket(commands[0], commands[1], commands[2], commands[3], 
+                    1, 2, 4, 3);
+            break;
+            
+          case 2:
+            createPacket(commands[0], commands[1], commands[2], commands[3], 
+                    2, 4, 3, 1);
+            break;
+            
+          case 3:
+            createPacket(commands[0], commands[1], commands[2], commands[3], 
+                    3, 1, 2, 4);
+            break;
+            
+          case 4:
+            createPacket(commands[0], commands[1], commands[2], commands[3], 
+                    4, 3, 1, 2);
+            break;
+
+        }
 
         sendXbee();
+
+        break;
+
+      case 10:
+
+        // reserved actionId for sending stationNumber to server
+        break;
+
+      case 11:
+  
+        // Tell car to go from server when stopped
+        serverGoFromStation = true;
+  
+        break;
+
+        // Create packet to send to the server
+//        createPacket(commands[0], commands[1], commands[2], commands[3], 
+//                    0, 0, 0, closestStationNumberToThisCar);
+
     }
   
     // Resets the ActionId to zero to let the pod know to accept other commands from the server
@@ -611,18 +750,27 @@ void receiveXbeeMessage()
 
   // Fill the array with the list of commands.
   while(Serial.available()) {
-    delay(10);  //small delay to allow input buffer to fill
+
+    //delay(2);  //small delay to allow input buffer to fill
 
     // Read and translate message to int in order to store the values into an int array
     in = (char)Serial.read();
+
+    //Serial.println(in);
+    
+    // Translates the read message to something readable
     additive = (int)in - 48;
 
+    // Stores the message to the int array and increments to receive a new message
     commands[counterForCommands] = additive;
     counterForCommands++;
+
+    // Testing to see if less of the controls methods will be blocked by receiving messages
+    controls();
   }
 
   // Checks if command was sent to correct XBee
-  if (podNumber != commands[1]) {
+  if (podNumber != (String(commands[0]) + String(commands[1])).toInt()) {
     commands[3] = 0;
   }
 }
@@ -636,13 +784,13 @@ void sendXbee()
   String completeMSG;
 
   // Check the ActionId value whether to accept values or not
-  if(commands[3] != 0) {
+  if((String(commands[2]) + String(commands[3])).toInt() > 0) {
 
       // Since the int array has 8 values, simply for loop through 8 times.
       for (int checkcounter = 0; checkcounter < 8; checkcounter++) {
 
           // Store the whole array into one String to send 
-          completeMSG += String(commands[checkcounter]);
+          completeMSG += String(commands[checkcounter]);          
           
           //Serial.print(commands[checkcounter]);
       }
@@ -686,97 +834,48 @@ void setNextStation(int station_number)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int getClosestStationNumber() {
-/**
-  to Station 1 from each Checkpoint's forward magnet:
-    CH4 = 100 ticks
-    CH3 = 246 ticks
 
-  to Station 2 from each Checkpoint's forward magnet:
-    CH1 = 20 ticks
-    CH4 = after 100 ticks
+  int lastCheckpoint = getCheckpointNumber();
+  bool magnetCheck = isBeforeMagnet;
 
-  to Station 3 from each Checkpoint's forward magnet:
-    CH3 = 20 ticks
-    CH2 = after 100 ticks
-
-  to Station 4 from each Checkpoint's forward magnet:
-    CH2 = 100 ticks
-    CH1 = 246 ticks
-
-  Order of closest starting from Station 1:
-    4, 3, 2, 1
-
-  Order of closest starting from Station 2:
-    1, 4, 3, 2
-
-  Order of closest starting from Station 3:
-    3, 2, 1, 4
-
-  Order of closest starting from Station 4:
-    2, 1, 4, 3
-  */
-
-  int currentTicks = getTicks();
-  int currentCheckpoint = tickCounterStation;
-
-  switch (currentCheckpoint) {
+  switch(lastCheckpoint) {
     case 1:
-
-      if (currentTicks < 20) {
-        firstChoiceForInitialPath = true;
+      if (magnetCheck) {
         return 2;
       }
-
       else {
-        firstChoiceForInitialPath = false;
         return 4;
       }
+      break;
       
-    break;
-    
     case 2:
-
-      if (currentTicks < 100) {
-        firstChoiceForInitialPath = true;
+      if (magnetCheck) {
         return 4;
-      }      
-
+      }
       else {
-        firstChoiceForInitialPath = false;
         return 3;
       }
-
-    break;
-    
+      break;
+      
     case 3:
-
-      if(currentTicks < 20) {
-        firstChoiceForInitialPath = true;
+      if (magnetCheck) {
         return 3;
       }
-
       else {
-        firstChoiceForInitialPath = false;
         return 1;
       }
-      
-    break;
+      break;
     
     case 4:
-
-      if (currentTicks < 100) {
-        firstChoiceForInitialPath = true;
+      if (magnetCheck) {
         return 1;
       }
-
       else {
-        firstChoiceForInitialPath = false;
         return 2;
       }
-
-    break;
-    
+      break;
   }
+  
 }
 
 ///////////////////////////////////// GET CHECKPOINT ////////////////////////////////////////////////////////////
@@ -822,9 +921,6 @@ int getStationNumber()
 
     /* Get the Serial number of the tag */
     SSN = RC522.serNum[0];
-
-    //Serial.println(SSN);
-    //Serial.println(testHowManyLoops);
     
     // For round tags SSN = 85, For Cards SSN = 35
     if (SSN == STATIONONE)
@@ -858,14 +954,20 @@ int getTicks()
 
     int pos1 = analogRead(POS_SENSOR1);    
     int pos2 = analogRead(POS_SENSOR2);
+
+    //Serial.println("pos1");
+    //Serial.println(pos1); //265 avg no metal strip/ 255 avg metal strip
+//    Serial.println("pos2");
+    //Serial.println(pos2); // 265 no strip/ strip is 257
     
-    if(pos1 < 475 && isFirstPosTickThrough)
+    if(pos1 < 257 && isFirstPosTickThrough)
     {
       Peak_Num++;
+      //Serial.println(Peak_Num);
       isFirstPosTickThrough = false;
     }
 
-    else if (pos1 < 475) {
+    else if (pos1 < 257) {
       // do nothing      
     }
 
@@ -873,13 +975,14 @@ int getTicks()
       isFirstPosTickThrough = true;
     }
 
-    if(pos2 < 478 && isSecondPosTickThrough)
+    if(pos2 < 260 && isSecondPosTickThrough)
     {
       Peak_Num++;      
+      //Serial.println(Peak_Num);
       isSecondPosTickThrough = false;
     }
 
-    else if (pos2 < 478) {
+    else if (pos2 < 260) {
       // do nothing
     }
 
@@ -1150,11 +1253,311 @@ void setStateLED(int colorState)
   checkBlinks();
 }
 
+void toStation(int startingDestination){
+
+  switch (startingDestination) {
+
+    case 1:
+      goToStationOne();
+      break;
+
+    case 2:
+      goToStationTwo();
+      break;
+
+    case 3:
+      goToStationThree();
+      break;
+
+    case 4:
+      goToStationFour();
+      break;
+    
+  }
+  
+}
+
+void goToStationOne() {
+
+  int checkpoint = getCheckpointNumber();
+  int magnetCheck = isBeforeMagnet;
+
+  switch (checkpoint) {
+
+    case 1:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(exactlyAfterStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyAfterStationOneFour[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(fromMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fromMiddleIntoStationOneFour[i]);
+        }
+      }
+      break;
+
+    case 2:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(fromMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fromMiddleIntoStationOneFour[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(passMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(passMiddleIntoStationOneFour[i]);
+        }
+      }
+      break;
+
+    case 3:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(passMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(passMiddleIntoStationOneFour[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(switchIntoClosestStation)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(switchIntoClosestStation[i]);
+        }
+      }
+      break;
+
+    case 4:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(switchIntoClosestStation)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(switchIntoClosestStation[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(exactlyAfterStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyAfterStationOneFour[i]);
+        }
+      }
+      break;
+  }
+}
+
+void goToStationTwo() {
+
+  int checkpoint = getCheckpointNumber();
+  int magnetCheck = isBeforeMagnet;
+
+  switch (checkpoint) {
+
+    case 1:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(exactlyBeforeStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyBeforeStationTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(fullCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fullCircleIntoStationTwoThree[i]);
+        }
+      }
+      break;
+
+    case 2:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(fullCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fullCircleIntoStationTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(afterStationOneFourToTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(afterStationOneFourToTwoThree[i]);
+        }
+      }
+      break;
+
+    case 3:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(afterStationOneFourToTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(afterStationOneFourToTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(halfCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(halfCircleIntoStationTwoThree[i]);
+        }
+      }
+      break;
+
+    case 4:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(halfCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(halfCircleIntoStationTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(exactlyBeforeStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyBeforeStationTwoThree[i]);
+        }
+      }
+      break;
+  }
+}
+
+void goToStationThree() {
+
+  int checkpoint = getCheckpointNumber();
+  int magnetCheck = isBeforeMagnet;
+
+  switch (checkpoint) {
+
+    case 1:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(afterStationOneFourToTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(afterStationOneFourToTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(halfCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(halfCircleIntoStationTwoThree[i]);
+        }
+      }
+      break;
+
+    case 2:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(halfCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(halfCircleIntoStationTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(exactlyBeforeStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyBeforeStationTwoThree[i]);
+        }
+      }
+      break;
+
+    case 3:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(exactlyBeforeStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyBeforeStationTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(fullCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fullCircleIntoStationTwoThree[i]);
+        }
+      }
+      break;
+
+    case 4:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(fullCircleIntoStationTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fullCircleIntoStationTwoThree[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(afterStationOneFourToTwoThree)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(afterStationOneFourToTwoThree[i]);
+        }
+      }
+      break;
+  }
+}
+
+void goToStationFour() {
+
+  int checkpoint = getCheckpointNumber();
+  int magnetCheck = isBeforeMagnet;
+
+  switch (checkpoint) {
+
+    case 1:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(passMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(passMiddleIntoStationOneFour[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(switchIntoClosestStation)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(switchIntoClosestStation[i]);
+        }
+      }
+      break;
+
+    case 2:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(switchIntoClosestStation)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(switchIntoClosestStation[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(exactlyAfterStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyAfterStationOneFour[i]);
+        }
+      }
+      break;
+
+    case 3:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(exactlyAfterStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(exactlyAfterStationOneFour[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(fromMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fromMiddleIntoStationOneFour[i]);
+        }
+      }
+      break;
+
+    case 4:
+
+      if(magnetCheck) {
+        for(int i = (sizeof(fromMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(fromMiddleIntoStationOneFour[i]);
+        }
+      }
+      
+      else {
+        for(int i = (sizeof(passMiddleIntoStationOneFour)/2)-1; i > -1 ; i--) {
+          scheduleArray.push(passMiddleIntoStationOneFour[i]);
+        }
+      }
+      break;
+  }
+}
+
 //////////////////////////////////// SET STACK ARRAY /////////////////////////////////////////////////////////
 void setStackArray(int from, int to)
 {
 
-  // Generate the value to compare to each of these+
+  // Generate the value to compare to each of these
   int fromTo = (String(from) + String(to)).toInt();
   
   // 
@@ -1320,7 +1723,7 @@ bool isAtStation() {
   /* Get the Serial number of the tag */
   SSN = RC522.serNum[0];
 
-  Serial.println(SSN);
+  //Serial.println(SSN);
 
   // Checks for each Station Number to see if the Podcar is at a Station
   if (SSN == STATIONONE || SSN == STATIONTWO || SSN == STATIONTHREE || SSN == STATIONFOUR) {
@@ -1336,6 +1739,7 @@ bool isAtStation() {
 bool isSomethingInFront()
 {
   ultrasonic();
+  ultrasonic2();
 
   bool collision_detection;
   
@@ -1395,7 +1799,7 @@ void magnetRead()
 }
 
 ///////////////////////////////////////// ULTRASONIC ////////////////////////////////////////////////////////
-// Function that will return the distance from the ultrasonic sensor
+// Function that will return the distance from the ultrasonic sensor in the front of the car
 void ultrasonic()
 {
   /* The following trigPin/echoPin cycle is used to determine the distance of 
@@ -1417,9 +1821,34 @@ void ultrasonic()
    distance = duration/58.2;
 }
 
+///////////////////////////////////////// ULTRASONIC2 ////////////////////////////////////////////////////////
+// Function that will return the distance from the ultrasonic sensoron the side of the car
+void ultrasonic2()
+{
+  /* The following trigPin/echoPin cycle is used to determine the distance of 
+   *  the nearest object by bouncing soundwaves off of it 
+   */
+
+   digitalWrite(TRIG2, OFF);
+   delayMicroseconds(2);
+
+   digitalWrite(TRIG2, ON);
+   delayMicroseconds(10);
+
+   digitalWrite(TRIG2, OFF);
+
+   // Returns the length of the pulse in microseconds
+   duration = pulseIn(ECHO2, ON);
+
+   // Calculate the distance (in cm) based on the speed of sound
+   distance = duration/58.2;
+}
+
 ///////////////////////////////// IF SMART MAGNET DETECTED //////////////////////////////////////////////////
 void IfSmartMagnetDetected()
 {
+
+  magnetRead();
 
 //  if (hall_1_state == 0) //If smart sensor detects a magnet
 //  {
@@ -1430,6 +1859,9 @@ void IfSmartMagnetDetected()
 //  }
 
     if (hall_1_state==0) {
+
+      // change to bool function later
+      isBeforeMagnet = false;
 
       if (!scheduleArray.isEmpty()) //If smart sensor detects a magnet and stack is not empty
       {
@@ -1452,7 +1884,7 @@ void IfSmartMagnetDetected()
       }
 
       else {
-        SERVOINT = 140;
+        SERVOINT = 20;
         leverArm.write(SERVOINT);
       }
 
@@ -1463,6 +1895,8 @@ void IfSmartMagnetDetected()
 // Switches the lever arm if a dumb magnet is detected
 void IfDumbMagnetDetected()
 {
+  magnetRead();
+  
   if (hall_2_state == 0) //If dumb sensor detects a magnet
   {
     SERVOINT = 140;
@@ -1482,9 +1916,97 @@ void speedUpFromStop() {
   setSpeedOfMotors(SPEED);
 }
 
+// example of interrupt kill state
+void kindaKillState() {
+
+  int stay = 1;
+
+  while (stay == 1) {
+    STATEOFCAR = 2;
+    setStateLED(STATEOFCAR);
+    SPEED = 0;
+    setSpeedOfMotors(SPEED);
+
+    if (digitalRead(RESET) < 1) {
+      stay = 0;
+    }
+  }
+  
+}
+
 ///////////////////////////////// INSIDE THE KILLED STATE ////////////////////////////////////////////////////
 // This is how the vehicle performs the killed state
+//void inKilledState() {
+//
+//  // Creates a latching button
+//  int stayInKill = 1;
+//  bool killPressedOnce = true;
+//
+//  // Make it so that the kill switch interrupt pin is reattached later.
+//  killStateNotRefreshed = true;
+//
+//  // detach the kill switch for the kill state
+//  detachInterrupt(digitalPinToInterrupt(KILL_SWITCH));
+//
+//  // Continues to blink the LED red while latching button is in effect
+//  // Only way to stop this cycle is to reset Arduino or add another button
+//  while(stayInKill == 1)
+//  {
+//    // This if/else block toggles the angle of the servo arm based on how many times the kill switch has been pressed.
+//    if ((killStatePressedTwice % 2 == 0 && digitalRead(KILL_SWITCH) < 1) && killPressedOnce) {
+//      SERVOINT = 20;
+//      leverArm.write(SERVOINT);  
+//      killStatePressedTwice++;
+//      killPressedOnce = false;
+//    }
+//    else if (killStatePressedTwice % 2 == 0 && digitalRead(KILL_SWITCH) < 1) {
+//      // Only pressed once.
+//    }
+//    else {
+//      SERVOINT = 140;
+//      leverArm.write(SERVOINT);
+//      killStatePressedTwice++;
+//      killPressedOnce = true;
+//    }  
+//    
+//    STATEOFCAR = 2;
+//    setStateLED(STATEOFCAR);
+//    SPEED = 0;
+//    setSpeedOfMotors(SPEED);
+//    
+//    if (digitalRead(RESET) < 1) {
+//      stayInKill = 0;
+//    }
+//    //delay(35);
+//  }
+//  
+//  killStatePressedTwice = 0;
+//  
+//}
+
+///////////////////////////////// STOP AT A STATION ////////////////////////////////////////////////////
+// Stops the car at a station for a bit
+bool isStoppedAtStation() {
+
+  if (howLongToStayAtStation > 50 && serverGoFromStation) {
+    return true;
+  }
+
+  else if (howLongToStayAtStation > 50 ) {
+    // waiting for command to go from station
+    return false;
+  }
+
+  else {
+    howLongToStayAtStation++;
+    return false;
+  }
+}
+
+// This is how the vehicle performs the killed state
 void inKilledState() {
+
+  //killState();
   
   // Creates a latching button
   kill_latch_state = false;
@@ -1496,16 +2018,23 @@ void inKilledState() {
   {
     // This if/else block toggles the angle of the servo arm based on how many times the kill switch has been pressed.
     if (killStatePressedTwice % 2 == 0 && killStatePressedTwice != 0) {
-      leverArm.write(90);  
+      SERVOINT = 20;
+      leverArm.write(SERVOINT);  
     }
     else {
+      SERVOINT = 140;
       leverArm.write(SERVOINT);
-    }
+    }  
     
     STATEOFCAR = 2;
     setStateLED(STATEOFCAR);
     SPEED = 0;
     setSpeedOfMotors(SPEED);
+    if (needToFlush) {
+      while (Serial.available() > 0) {
+        Serial.read();
+      }
+    }
     delay(35);
   }
 
@@ -1515,20 +2044,99 @@ void inKilledState() {
   
 }
 
-///////////////////////////////// STOP AT A STATION ////////////////////////////////////////////////////
-// Stops the car at a station for a bit
-bool isStoppedAtStation() {
-
-  if (howLongToStayAtStation > 150) {
-    return true;
-  }
-
-  else {
-    howLongToStayAtStation++;
-    return false;
-  }
-}
-
+//int getClosestStationNumber() {
+///**
+//  to Station 1 from each Checkpoint's forward magnet:
+//    CH4 = 100 ticks
+//    CH3 = 246 ticks
+//
+//  to Station 2 from each Checkpoint's forward magnet:
+//    CH1 = 20 ticks
+//    CH4 = after 100 ticks
+//
+//  to Station 3 from each Checkpoint's forward magnet:
+//    CH3 = 20 ticks
+//    CH2 = after 100 ticks
+//
+//  to Station 4 from each Checkpoint's forward magnet:
+//    CH2 = 100 ticks
+//    CH1 = 246 ticks
+//
+//  Order of closest Checkpoint starting from Station 1:
+//    4, 3, 2, 1
+//
+//  Order of closest Checkpoint starting from Station 2:
+//    1, 4, 3, 2
+//
+//  Order of closest Checkpoint starting from Station 3:
+//    3, 2, 1, 4
+//
+//  Order of closest Checkpoint starting from Station 4:
+//    2, 1, 4, 3
+//  */
+//
+//  int currentTicks = getTicks();
+//  int currentCheckpoint = tickCounterStation;
+//
+//  switch (currentCheckpoint) {
+//    case 1:
+//
+//      if (currentTicks < 20) {
+//        firstChoiceForInitialPath = true;
+//        return 2;
+//      }
+//
+//      else {
+//        firstChoiceForInitialPath = false;
+//        return 4;
+//      }
+//      
+//    break;
+//    
+//    case 2:
+//
+//      if (currentTicks < 100) {
+//        firstChoiceForInitialPath = true;
+//        return 4;
+//      }      
+//
+//      else {
+//        firstChoiceForInitialPath = false;
+//        return 3;
+//      }
+//
+//    break;
+//    
+//    case 3:
+//
+//      if(currentTicks < 20) {
+//        firstChoiceForInitialPath = true;
+//        return 3;
+//      }
+//
+//      else {
+//        firstChoiceForInitialPath = false;
+//        return 1;
+//      }
+//      
+//    break;
+//    
+//    case 4:
+//
+//      if (currentTicks < 100) {
+//        firstChoiceForInitialPath = true;
+//        return 1;
+//      }
+//
+//      else {
+//        firstChoiceForInitialPath = false;
+//        return 2;
+//      }
+//
+//    break;
+//    
+//  }
+//}
 
 
 

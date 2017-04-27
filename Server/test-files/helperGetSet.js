@@ -157,7 +157,7 @@ function getData() {
 }
 
 function openPort() {
-    var serialPortId = '/dev/ttyUSB3';
+    var serialPortId = '/dev/ttyUSB1';
 
     var port = new SerialPort(serialPortId, {
         autoOpen: false,
@@ -171,5 +171,51 @@ function openPort() {
       if (err) {
         return console.log('Error opening port: ', err.message);
       }
+    });
+}
+
+exports.stayOpen = function stayOpen(value, callback) {
+
+    // Refresh port every time we call stayOpen(..)
+    var port = new SerialPort(serialPortId, {
+        autoOpen: false,
+        baudrate: 57600
+    });
+
+    // Set listener for port opening. We write to the xbee in callback.
+    port.on('open', function() {
+        port.on('data', function (fromXbee) {
+
+
+            console.log(fromXbee.toString('utf8'));
+            // If the user passed a callback function, we run it
+            // if (callback) {
+            //     // Handle data from xbee
+            //     console.log('Data received: ' + fromXbee);
+            //     callback(fromXbee);
+            // }
+            
+            //port.close();
+        });
+        
+        // console.log('Writing value to xbee');
+        // port.write(value);
+    });
+    
+    // We open the port, which will fire off our .on('open') callback
+    // function that writes to the xbee.
+    port.open(function (err) {
+        if (err) {
+            console.log('Error opening port: ', err.message);
+            console.log('Retrying to open port...');
+            // If there is a problem opening the port, we retry opening
+            // in 500 ms. In most cases, a port will not open because
+            // it is currently opened by another file.
+            setTimeout(function() {
+                //writeToXbee(value);
+            }, 1000);
+        } else {
+            console.log('Port opened');
+        }
     });
 }
