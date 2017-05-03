@@ -32,12 +32,13 @@ var ledState = {             // Status code
     YELLOW_FLASH: '0010',    // 400
 }
 
-var listener = messenger.createListener(8006);
+
 module.exports = function(input, done) {
 //    var podNum = input.podNum + 1;
-    var podNum = 6;
+    var podNum = 3;
     var userId = input.userId;
     var portNum = input.portNum;
+    var listener = messenger.createListener(8000 + parseInt(podNum));
     console.log('portNum: ' + portNum);
     var status =- 1;
     

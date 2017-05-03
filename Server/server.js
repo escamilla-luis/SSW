@@ -72,9 +72,9 @@ function processStream(data) {
 	console.log('Action Info: ' + actionInfo);
 	
 	// Update speaker port #
-	var port_number = 8000 + parseInt(podNum);
-	console.log('Speaker port #: ' + port_number);
-	var speaker = messenger.createSpeaker(port_number);
+	var portNumber = 8000 + parseInt(podNum);
+	var speaker = messenger.createSpeaker(portNumber);
+	console.log('Speaker port #: ' + portNumber);
 	
 	switch (actionId) {
 		case podAction.GET_CLOSEST_STATION:
@@ -122,7 +122,7 @@ function processStream(data) {
 			setTimeout(function() {
 				console.log('SPEAKER.REQUEST');
 				speaker.request('messageFromPod', { podStatus: podStatus }, onReplyCallback);	
-			}, 1500);
+			}, 1200);
 			break;
 		default:
 			console.log('Error: Unrecognized Action ID');
