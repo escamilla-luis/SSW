@@ -31,10 +31,10 @@ var databuffer = [];
 var stream = '';
 
 // Global, shared variables between functions used for pod scheduling
-//var podSchedule = ['free', 'free', 'free', 'free'];
-var podSchedule = ['free'];
+var podSchedule = ['free', 'free'];
 var overflowQueue = []; // .push() to enqueue, .shift() to dequeue
 
+// For getClosestStation()
 var numFreePods = 0;
 var userIdShared = ''; // 
 var startingStationShared = 0;
@@ -118,7 +118,6 @@ function processStream(data) {
 		case podAction.STOPPED_AT_STATION:
 			console.log('STOPPED_AT_STATION');
 			var podStatus = actionInfo.substring(0, 3);
-			console.log('podStatus: ' + podStatus);
 			setTimeout(function() {
 				console.log('SPEAKER.REQUEST');
 				speaker.request('messageFromPod', { podStatus: podStatus }, onReplyCallback);	
@@ -183,7 +182,6 @@ var onReplyCallback = function(replyData) {
 	console.log('onReplyCallback: ' + replyData.message);
 }
 
-
 /** -== Server/Client code ==- **/
 
 // This callback gets executed when the client sends the server a reply 
@@ -217,13 +215,12 @@ firebase.setListenerForAllCurrentTickets(function(snapshot) {
 			ticketRef.child('isNewTicket').set(false);
 			
 			startingStationShared = ticketSnapshot.child('from').val();			
-			userIdShared = userId;
-			closestToStationFlag = true;
-			collectClosestStations();
-			spawnClientThread(6, userId, 8006)
-			
+//			userIdShared = userId;
+//			closestToStationFlag = true;
+//			collectClosestStations();
+						
 			// Queue pod 
-//			fillIfAvailable(userId);
+			fillIfAvailable(userId);
 		}
 });
 
@@ -267,7 +264,8 @@ function spawnClientThread(podNum, userId, portNum) {
 				thread.kill();
 				
 				// Free pod schedule and dequeue users off overflow (if any)
-				podSchedule[message.podNum] = 'free';
+				var index = parseInt(message.podNum) - 1;
+				podSchedule[index] = 'free';
 				dequeueOverflow();
 			} else {
 				// Client thread is sending request for something (to run action or obtain information
@@ -302,7 +300,7 @@ function addUserToPodSchedule(userId) {
 	podSchedule.every(function(item, index) {
 		if (item == 'free') {
 			podSchedule[index] = userId;
-			spawnClientThread(index, userId, 8001 + index);
+			spawnClientThread(index + 1, userId, 8001 + index);
 			return false;  // Break out of loop
 		}
 		return true; 		// Continue loop
@@ -313,6 +311,7 @@ function addUserToPodSchedule(userId) {
 function assignUserToPodNumber(userId, podNumber) {
 	console.log('assignUserToPodNumber()');
 	podSchedule[podNumber] = userId;
+	console.log('podSchedule: ' + podSchedule)
 	spawnClientThread(podNumber, userId, 8001 + podNumber);
 }
 
